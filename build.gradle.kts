@@ -31,5 +31,15 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+
+        // Podman on macOS: containers run in a Linux VM where the socket path
+        // differs from the macOS host path. Tell Testcontainers the VM-internal
+        // socket so Ryuk can mount it correctly.
+        if (System.getenv("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE") == null) {
+            val dockerHost = System.getenv("DOCKER_HOST") ?: ""
+            if (dockerHost.contains("podman")) {
+                environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/run/podman/podman.sock")
+            }
+        }
     }
 }

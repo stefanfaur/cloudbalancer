@@ -3,11 +3,22 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 
-# IDE
+# IDE — IntelliJ
 .idea/
 *.iml
+
+# IDE — Eclipse / Buildship
+.project
+.classpath
+.settings/
+bin/
+
+# IDE — VS Code
 .vscode/
 *.swp
+
+# Compiled classes
+*.class
 
 # OS
 .DS_Store
