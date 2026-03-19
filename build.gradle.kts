@@ -25,6 +25,7 @@ subprojects {
         implementation(platform(rootProject.libs.spring.boot.bom))
         testImplementation(platform(rootProject.libs.testcontainers.bom))
         testImplementation(rootProject.libs.junit.jupiter)
+        testRuntimeOnly(rootProject.libs.junit.platform.launcher)
         testImplementation(rootProject.libs.assertj.core)
     }
 

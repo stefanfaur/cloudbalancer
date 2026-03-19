@@ -1,0 +1,6 @@
+package com.cloudbalancer.common.model;
+
+public enum TaskState {
+    SUBMITTED, VALIDATED, QUEUED, ASSIGNED, PROVISIONING,
+    RUNNING, POST_PROCESSING, COMPLETED, FAILED, TIMED_OUT, CANCELLED
+}
