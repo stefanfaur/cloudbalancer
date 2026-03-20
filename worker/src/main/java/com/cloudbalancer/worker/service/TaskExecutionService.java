@@ -14,6 +14,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class TaskExecutionService {
@@ -23,6 +25,12 @@ public class TaskExecutionService {
     private final String workerId;
     private final Map<ExecutorType, TaskExecutor> executors;
     private final ExecutorService threadPool = Executors.newCachedThreadPool();
+
+    private final AtomicInteger activeTaskCount = new AtomicInteger(0);
+    private final AtomicLong completedTaskCount = new AtomicLong(0);
+    private final AtomicLong failedTaskCount = new AtomicLong(0);
+    private final AtomicLong totalExecutionDurationMs = new AtomicLong(0);
+    private final AtomicLong executionCount = new AtomicLong(0);
 
     public TaskExecutionService(KafkaTemplate<String, String> kafkaTemplate,
                                  @Value("${cloudbalancer.worker.id:worker-1}") String workerId) {
@@ -56,6 +64,7 @@ public class TaskExecutionService {
             executor.execute(descriptor.executionSpec(), allocation, context)
         );
 
+        activeTaskCount.incrementAndGet();
         try {
             ExecutionResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
             publishResult(assignment.taskId(), new TaskResult(
@@ -63,19 +72,41 @@ public class TaskExecutionService {
                 result.stdout(), result.stderr(), result.durationMs(),
                 result.timedOut(), Instant.now()
             ));
+            if (result.succeeded()) {
+                completedTaskCount.incrementAndGet();
+                totalExecutionDurationMs.addAndGet(result.durationMs());
+                executionCount.incrementAndGet();
+            } else {
+                failedTaskCount.incrementAndGet();
+            }
         } catch (TimeoutException e) {
             future.cancel(true);
+            failedTaskCount.incrementAndGet();
             publishResult(assignment.taskId(), new TaskResult(
                 assignment.taskId(), workerId, 1, "",
                 "Execution timed out after " + timeoutSeconds + "s",
                 timeoutSeconds * 1000L, true, Instant.now()
             ));
         } catch (Exception e) {
+            failedTaskCount.incrementAndGet();
             publishResult(assignment.taskId(), new TaskResult(
                 assignment.taskId(), workerId, 1, "",
                 "Execution error: " + e.getMessage(), 0, false, Instant.now()
             ));
+        } finally {
+            activeTaskCount.decrementAndGet();
         }
+    }
+
+    public int getActiveTaskCount() { return activeTaskCount.get(); }
+
+    public long getCompletedTaskCount() { return completedTaskCount.get(); }
+
+    public long getFailedTaskCount() { return failedTaskCount.get(); }
+
+    public double getAverageExecutionDurationMs() {
+        long count = executionCount.get();
+        return count == 0 ? 0.0 : (double) totalExecutionDurationMs.get() / count;
     }
 
     private void publishResult(UUID taskId, TaskResult result) {
