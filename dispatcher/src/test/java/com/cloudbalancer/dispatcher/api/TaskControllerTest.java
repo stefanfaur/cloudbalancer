@@ -2,10 +2,17 @@ package com.cloudbalancer.dispatcher.api;
 
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
+import com.cloudbalancer.dispatcher.security.JwtService;
+import com.cloudbalancer.dispatcher.security.RateLimitFilter;
+import com.cloudbalancer.dispatcher.security.RateLimitProperties;
+import com.cloudbalancer.dispatcher.security.RefreshTokenRepository;
+import com.cloudbalancer.dispatcher.security.UserService;
 import com.cloudbalancer.dispatcher.service.TaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,12 +25,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TaskController.class)
+@Import({RateLimitFilter.class, RateLimitProperties.class})
 class TaskControllerTest {
 
     @Autowired private MockMvc mvc;
     @MockitoBean private TaskService taskService;
+    @MockitoBean private JwtService jwtService;
+    @MockitoBean private UserService userService;
+    @MockitoBean private RefreshTokenRepository refreshTokenRepository;
 
     @Test
+    @WithMockUser(roles = "OPERATOR")
     void submitTaskReturns201WithEnvelope() throws Exception {
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 1000),
@@ -45,6 +57,7 @@ class TaskControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "OPERATOR")
     void submitTaskWithNullExecutorTypeReturns400() throws Exception {
         String body = """
             {"executionSpec": {"durationMs": 1000}, "priority": "NORMAL"}
@@ -55,6 +68,7 @@ class TaskControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "VIEWER")
     void getTaskByIdReturnsTask() throws Exception {
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 1000),
@@ -71,6 +85,7 @@ class TaskControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "VIEWER")
     void getTaskByNonexistentIdReturns404() throws Exception {
         when(taskService.getTask(any())).thenReturn(null);
 
@@ -79,6 +94,7 @@ class TaskControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "VIEWER")
     void listTasksReturnsAll() throws Exception {
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 1000),

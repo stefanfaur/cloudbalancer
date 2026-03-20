@@ -1,6 +1,7 @@
 package com.cloudbalancer.dispatcher.integration;
 
 import com.cloudbalancer.common.model.*;
+import com.cloudbalancer.common.util.JsonUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,23 @@ class FullLifecycleIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        restClient = RestClient.create("http://localhost:" + port);
+        var baseClient = RestClient.create("http://localhost:" + port);
+
+        // Login as seed admin to get access token
+        String loginResponse = baseClient.post()
+            .uri("/api/auth/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of("username", "admin", "password", "admin"))
+            .retrieve()
+            .body(String.class);
+        String accessToken = JsonUtil.mapper()
+            .readTree(loginResponse).get("accessToken").asText();
+
+        restClient = RestClient.builder()
+            .baseUrl("http://localhost:" + port)
+            .defaultHeader("Authorization", "Bearer " + accessToken)
+            .build();
+
         worker = new TestWorkerSimulator("integration-worker-1", kafka.getBootstrapServers());
         worker.start();
         Thread.sleep(2000); // allow registration to propagate
