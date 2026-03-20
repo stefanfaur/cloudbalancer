@@ -1,5 +1,5 @@
 # docker/docker-compose.dev.yml
-# CloudBalancer development stack — Phase 4: Kafka + PostgreSQL
+# CloudBalancer development stack — Phase 5: Kafka + TimescaleDB + Metrics
 
 services:
   kafka:
@@ -21,7 +21,7 @@ services:
       CLUSTER_ID: cloudbalancer-dev-cluster-001
 
   postgres:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:latest-pg16
     container_name: cloudbalancer-postgres
     environment:
       POSTGRES_DB: cloudbalancer
@@ -36,6 +36,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  metrics-aggregator:
+    build:
+      context: ..
+      dockerfile: metrics-aggregator/Dockerfile
+    container_name: cloudbalancer-metrics-aggregator
+    ports:
+      - "8081:8081"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cloudbalancer
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata:

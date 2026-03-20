@@ -5,12 +5,15 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class TestContainersConfig {
 
     private static final PostgreSQLContainer<?> POSTGRES =
-        new PostgreSQLContainer<>("postgres:16-alpine")
+        new PostgreSQLContainer<>(
+            DockerImageName.parse("timescale/timescaledb:latest-pg16")
+                .asCompatibleSubstituteFor("postgres"))
             .withDatabaseName("cloudbalancer")
             .withUsername("postgres")
             .withPassword("postgres");
