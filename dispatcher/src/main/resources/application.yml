@@ -36,6 +36,9 @@ spring:
 cloudbalancer:
   dispatcher:
     assignment-interval-ms: 1000
+    heartbeat-suspect-threshold-seconds: 30
+    heartbeat-dead-threshold-seconds: 60
+    liveness-check-interval-ms: 10000
   security:
     jwt-secret: dGhpc2lzYXZlcnlsb25nc2VjcmV0a2V5Zm9ydGVzdGluZzEyMzQ1Njc4OTA=
     access-token-expiration-seconds: 900
