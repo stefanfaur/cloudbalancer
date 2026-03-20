@@ -1,6 +1,5 @@
 # docker/docker-compose.dev.yml
-# CloudBalancer development stack — Phase 1: Kafka only
-# More services added in later phases.
+# CloudBalancer development stack — Phase 4: Kafka + PostgreSQL
 
 services:
   kafka:
@@ -20,3 +19,23 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       CLUSTER_ID: cloudbalancer-dev-cluster-001
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudbalancer-postgres
+    environment:
+      POSTGRES_DB: cloudbalancer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:

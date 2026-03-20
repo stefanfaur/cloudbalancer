@@ -8,7 +8,10 @@ dependencies {
     implementation(libs.spring.boot.starter.kafka)
     implementation(libs.spring.boot.starter.security)
     implementation(libs.spring.boot.starter.data.jpa)
-    runtimeOnly(libs.h2.database)
+    implementation(libs.spring.boot.flyway)
+    implementation(libs.flyway.core)
+    implementation(libs.flyway.database.postgresql)
+    runtimeOnly(libs.postgresql)
     implementation(libs.jjwt.api)
     runtimeOnly(libs.jjwt.impl)
     runtimeOnly(libs.jjwt.jackson)
@@ -21,4 +24,6 @@ dependencies {
     testImplementation(libs.testcontainers.core)
     testImplementation(libs.testcontainers.junit)
     testImplementation(libs.testcontainers.kafka)
+    testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.spring.boot.testcontainers)
 }

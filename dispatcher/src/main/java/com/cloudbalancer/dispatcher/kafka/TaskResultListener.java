@@ -4,7 +4,9 @@ import com.cloudbalancer.common.event.TaskCompletedEvent;
 import com.cloudbalancer.common.event.TaskStateChangedEvent;
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
+import com.cloudbalancer.dispatcher.persistence.TaskRecord;
 import com.cloudbalancer.dispatcher.service.TaskService;
+import com.cloudbalancer.dispatcher.service.WorkerRegistryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -17,10 +19,13 @@ public class TaskResultListener {
 
     private static final Logger log = LoggerFactory.getLogger(TaskResultListener.class);
     private final TaskService taskService;
+    private final WorkerRegistryService workerRegistryService;
     private final EventPublisher eventPublisher;
 
-    public TaskResultListener(TaskService taskService, EventPublisher eventPublisher) {
+    public TaskResultListener(TaskService taskService, WorkerRegistryService workerRegistryService,
+                              EventPublisher eventPublisher) {
         this.taskService = taskService;
+        this.workerRegistryService = workerRegistryService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -28,40 +33,49 @@ public class TaskResultListener {
     public void onTaskResult(String message) {
         try {
             TaskResult result = JsonUtil.mapper().readValue(message, TaskResult.class);
-            TaskEnvelope envelope = taskService.getTask(result.taskId());
-            if (envelope == null) {
+            TaskRecord record = taskService.getTaskRecord(result.taskId());
+            if (record == null) {
                 log.warn("Received result for unknown task: {}", result.taskId());
                 return;
             }
 
-            TaskState previousState = envelope.getState();
+            TaskState previousState = record.getState();
 
-            // Fast-forward through intermediate states that the worker didn't report
-            if (envelope.getState() == TaskState.ASSIGNED) {
-                envelope.transitionTo(TaskState.PROVISIONING);
+            // Fast-forward through intermediate states
+            if (record.getState() == TaskState.ASSIGNED) {
+                record.transitionTo(TaskState.PROVISIONING);
             }
-            if (envelope.getState() == TaskState.PROVISIONING) {
-                envelope.transitionTo(TaskState.RUNNING);
+            if (record.getState() == TaskState.PROVISIONING) {
+                record.transitionTo(TaskState.RUNNING);
             }
 
             if (result.timedOut()) {
-                envelope.transitionTo(TaskState.TIMED_OUT);
+                record.transitionTo(TaskState.TIMED_OUT);
             } else if (result.succeeded()) {
-                envelope.transitionTo(TaskState.POST_PROCESSING);
-                envelope.transitionTo(TaskState.COMPLETED);
+                record.transitionTo(TaskState.POST_PROCESSING);
+                record.transitionTo(TaskState.COMPLETED);
             } else {
-                envelope.transitionTo(TaskState.FAILED);
+                record.transitionTo(TaskState.FAILED);
             }
 
             // Record execution attempt
-            envelope.addAttempt(new ExecutionAttempt(
-                envelope.getExecutionHistory().size() + 1,
+            record.addAttempt(new ExecutionAttempt(
+                record.getExecutionHistory().size() + 1,
                 result.workerId(),
-                envelope.getSubmittedAt(), // approximate
+                record.getSubmittedAt(),
                 Instant.now(),
                 result.exitCode(),
                 null
             ));
+
+            taskService.updateTask(record);
+
+            // Release resource ledger on terminal state
+            if (record.getState().isTerminal() && record.getAssignedWorkerId() != null) {
+                workerRegistryService.releaseResources(
+                    record.getAssignedWorkerId(),
+                    record.getDescriptor().resourceProfile());
+            }
 
             // Publish completion/failure events
             if (result.succeeded()) {
@@ -75,13 +89,13 @@ public class TaskResultListener {
                 eventPublisher.publishEvent("tasks.events", result.taskId().toString(),
                     new TaskStateChangedEvent(
                         UUID.randomUUID().toString(), Instant.now(),
-                        result.taskId(), previousState, envelope.getState(),
+                        result.taskId(), previousState, record.getState(),
                         result.timedOut() ? "Execution timed out" : "Execution failed: " + result.stderr()
                     )
                 );
             }
 
-            log.info("Task {} -> {}", result.taskId(), envelope.getState());
+            log.info("Task {} -> {}", result.taskId(), record.getState());
         } catch (Exception e) {
             log.error("Failed to process task result", e);
         }
