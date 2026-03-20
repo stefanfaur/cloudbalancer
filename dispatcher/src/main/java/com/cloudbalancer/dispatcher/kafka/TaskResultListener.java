@@ -49,6 +49,12 @@ public class TaskResultListener {
                 record.transitionTo(TaskState.RUNNING);
             }
 
+            // Set lifecycle timestamps
+            if (record.getStartedAt() == null) {
+                record.setStartedAt(result.completedAt().minusMillis(result.executionDurationMs()));
+            }
+            record.setCompletedAt(result.completedAt());
+
             if (result.timedOut()) {
                 record.transitionTo(TaskState.TIMED_OUT);
             } else if (result.succeeded()) {

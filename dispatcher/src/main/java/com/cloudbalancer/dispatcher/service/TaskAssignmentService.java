@@ -46,6 +46,7 @@ public class TaskAssignmentService {
             var worker = selected.get();
             task.transitionTo(TaskState.ASSIGNED);
             task.setAssignedWorkerId(worker.getId());
+            task.setAssignedAt(Instant.now());
             taskService.updateTask(task);
 
             workerRegistry.allocateResources(worker.getId(),

@@ -41,6 +41,15 @@ public class TaskRecord {
     @Convert(converter = ExecutionHistoryConverter.class)
     private List<ExecutionAttempt> executionHistory = new ArrayList<>();
 
+    @Column(name = "assigned_at")
+    private Instant assignedAt;
+
+    @Column(name = "started_at")
+    private Instant startedAt;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     protected TaskRecord() {}
 
     public static TaskRecord create(TaskDescriptor descriptor) {
@@ -71,6 +80,12 @@ public class TaskRecord {
     public void setAssignedWorkerId(String assignedWorkerId) { this.assignedWorkerId = assignedWorkerId; }
     public TaskDescriptor getDescriptor() { return descriptor; }
     public List<ExecutionAttempt> getExecutionHistory() { return executionHistory; }
+    public Instant getAssignedAt() { return assignedAt; }
+    public void setAssignedAt(Instant assignedAt) { this.assignedAt = assignedAt; }
+    public Instant getStartedAt() { return startedAt; }
+    public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
+    public Instant getCompletedAt() { return completedAt; }
+    public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 
     public void addAttempt(ExecutionAttempt attempt) {
         this.executionHistory.add(attempt);
