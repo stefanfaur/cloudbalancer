@@ -10,11 +10,12 @@ import java.time.Instant;
     @JsonSubTypes.Type(value = TaskStateChangedEvent.class, name = "TASK_STATE_CHANGED"),
     @JsonSubTypes.Type(value = TaskCompletedEvent.class, name = "TASK_COMPLETED"),
     @JsonSubTypes.Type(value = WorkerRegisteredEvent.class, name = "WORKER_REGISTERED"),
-    @JsonSubTypes.Type(value = WorkerHeartbeatEvent.class, name = "WORKER_HEARTBEAT")
+    @JsonSubTypes.Type(value = WorkerHeartbeatEvent.class, name = "WORKER_HEARTBEAT"),
+    @JsonSubTypes.Type(value = TaskAssignedEvent.class, name = "TASK_ASSIGNED")
 })
 public sealed interface CloudBalancerEvent
         permits TaskSubmittedEvent, TaskStateChangedEvent, TaskCompletedEvent,
-                WorkerRegisteredEvent, WorkerHeartbeatEvent {
+                WorkerRegisteredEvent, WorkerHeartbeatEvent, TaskAssignedEvent {
     String eventId();
     Instant timestamp();
     String eventType();

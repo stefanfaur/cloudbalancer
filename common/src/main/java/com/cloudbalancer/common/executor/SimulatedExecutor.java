@@ -5,15 +5,30 @@ import com.cloudbalancer.common.model.ExecutorType;
 import com.cloudbalancer.common.model.ResourceProfile;
 import com.cloudbalancer.common.model.SecurityLevel;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class SimulatedExecutor implements TaskExecutor {
 
     @Override
     public ExecutionResult execute(Map<String, Object> spec, ResourceAllocation allocation, TaskContext context) {
-        // Real execution logic comes in Phase 2.
-        // For now, return a simple success.
         int durationMs = ((Number) spec.getOrDefault("durationMs", 1000)).intValue();
-        return new ExecutionResult(0, "simulated output", "", durationMs, false);
+        double failProbability = ((Number) spec.getOrDefault("failProbability", 0.0)).doubleValue();
+
+        long start = System.currentTimeMillis();
+        try {
+            Thread.sleep(durationMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            long elapsed = System.currentTimeMillis() - start;
+            return new ExecutionResult(1, "", "Execution interrupted (timeout)", elapsed, true);
+        }
+        long elapsed = System.currentTimeMillis() - start;
+
+        if (ThreadLocalRandom.current().nextDouble() < failProbability) {
+            return new ExecutionResult(1, "", "Simulated failure (probability=" + failProbability + ")", elapsed, false);
+        }
+
+        return new ExecutionResult(0, "simulated output for task " + context.taskId(), "", elapsed, false);
     }
 
     @Override
