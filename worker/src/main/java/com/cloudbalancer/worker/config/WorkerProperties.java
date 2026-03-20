@@ -14,6 +14,8 @@ public class WorkerProperties {
     private int memoryMb = 8192;
     private int diskMb = 10240;
     private Set<String> tags = Set.of();
+    private long metricsIntervalMs = 5000;
+    private long heartbeatIntervalMs = 10000;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -27,4 +29,8 @@ public class WorkerProperties {
     public void setDiskMb(int diskMb) { this.diskMb = diskMb; }
     public Set<String> getTags() { return tags; }
     public void setTags(Set<String> tags) { this.tags = tags; }
+    public long getMetricsIntervalMs() { return metricsIntervalMs; }
+    public void setMetricsIntervalMs(long metricsIntervalMs) { this.metricsIntervalMs = metricsIntervalMs; }
+    public long getHeartbeatIntervalMs() { return heartbeatIntervalMs; }
+    public void setHeartbeatIntervalMs(long heartbeatIntervalMs) { this.heartbeatIntervalMs = heartbeatIntervalMs; }
 }

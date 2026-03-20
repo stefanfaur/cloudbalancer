@@ -20,3 +20,5 @@ cloudbalancer:
     memory-mb: 8192
     disk-mb: 10240
     tags: []
+    metrics-interval-ms: 5000
+    heartbeat-interval-ms: 10000
