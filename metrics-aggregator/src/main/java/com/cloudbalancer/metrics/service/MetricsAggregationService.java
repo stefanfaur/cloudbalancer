@@ -10,13 +10,10 @@ import com.cloudbalancer.metrics.persistence.WorkerHeartbeatRepository;
 import com.cloudbalancer.metrics.persistence.WorkerMetricsRecord;
 import com.cloudbalancer.metrics.persistence.WorkerMetricsRepository;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
