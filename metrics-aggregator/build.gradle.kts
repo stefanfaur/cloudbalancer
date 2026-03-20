@@ -11,11 +11,13 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
+    implementation(libs.spring.boot.starter.security)
     implementation(libs.jjwt.api)
     runtimeOnly(libs.jjwt.impl)
     runtimeOnly(libs.jjwt.jackson)
 
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.security.test)
     testImplementation(libs.spring.boot.webmvc.test)
     testImplementation(libs.testcontainers.core)
     testImplementation(libs.testcontainers.junit)
