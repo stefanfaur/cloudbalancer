@@ -1,15 +1,19 @@
 package com.cloudbalancer.dispatcher.security;
 
 import com.cloudbalancer.common.model.Role;
+import com.cloudbalancer.dispatcher.test.TestContainersConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@Import({UserService.class, BCryptPasswordEncoder.class})
+@SpringBootTest
+@Import(TestContainersConfig.class)
 class UserServiceTest {
 
     @Autowired
@@ -20,18 +24,20 @@ class UserServiceTest {
 
     @Test
     void authenticateWithValidCredentials() {
-        userService.createUser("testuser", "password123", Role.OPERATOR);
+        String username = "testuser-" + UUID.randomUUID();
+        userService.createUser(username, "password123", Role.OPERATOR);
 
-        var result = userService.authenticate("testuser", "password123");
+        var result = userService.authenticate(username, "password123");
         assertThat(result).isPresent();
         assertThat(result.get().getRole()).isEqualTo(Role.OPERATOR);
     }
 
     @Test
     void authenticateWithWrongPasswordReturnsEmpty() {
-        userService.createUser("testuser2", "password123", Role.OPERATOR);
+        String username = "testuser2-" + UUID.randomUUID();
+        userService.createUser(username, "password123", Role.OPERATOR);
 
-        var result = userService.authenticate("testuser2", "wrongpassword");
+        var result = userService.authenticate(username, "wrongpassword");
         assertThat(result).isEmpty();
     }
 
@@ -43,9 +49,10 @@ class UserServiceTest {
 
     @Test
     void createUserHashesPassword() {
-        userService.createUser("testuser3", "plaintext", Role.VIEWER);
+        String username = "testuser3-" + UUID.randomUUID();
+        userService.createUser(username, "plaintext", Role.VIEWER);
 
-        var user = userRepository.findByUsername("testuser3").orElseThrow();
+        var user = userRepository.findByUsername(username).orElseThrow();
         assertThat(user.getPassword()).isNotEqualTo("plaintext");
         assertThat(new BCryptPasswordEncoder().matches("plaintext", user.getPassword())).isTrue();
     }
