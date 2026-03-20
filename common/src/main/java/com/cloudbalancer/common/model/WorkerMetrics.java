@@ -1,10 +1,15 @@
 package com.cloudbalancer.common.model;
 
+import java.time.Instant;
+
 public record WorkerMetrics(
-    double cpuUtilization,
-    double memoryUsagePercent,
+    double cpuUsagePercent,
+    long heapUsedMB,
+    long heapMaxMB,
+    int threadCount,
     int activeTaskCount,
-    int queuedTaskCount,
-    double taskCompletionRate,
-    double averageTaskLatencyMs
+    long completedTaskCount,
+    long failedTaskCount,
+    double averageExecutionDurationMs,
+    Instant reportedAt
 ) {}

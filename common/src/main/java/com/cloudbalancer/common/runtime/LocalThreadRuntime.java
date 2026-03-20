@@ -17,7 +17,7 @@ public class LocalThreadRuntime implements NodeRuntime {
             new ResourceProfile(config.cpuCores(), config.memoryMB(), config.diskMB(), false, 0, true),
             config.tags()
         );
-        var metrics = new WorkerMetrics(0, 0, 0, 0, 0, 0);
+        var metrics = new WorkerMetrics(0, 0, 0, 0, 0, 0L, 0L, 0.0, Instant.now());
         var info = new WorkerInfo(config.workerId(), WorkerHealthState.HEALTHY, capabilities, metrics, Instant.now());
         workers.put(config.workerId(), info);
     }

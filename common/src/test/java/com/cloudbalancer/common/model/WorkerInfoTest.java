@@ -18,7 +18,7 @@ class WorkerInfoTest {
             new ResourceProfile(8, 16384, 51200, false, 0, true),
             Set.of("region-us")
         );
-        var metrics = new WorkerMetrics(45.5, 62.0, 3, 1, 12.5, 250.0);
+        var metrics = new WorkerMetrics(45.5, 2048, 4096, 16, 3, 100L, 2L, 250.0, Instant.now());
         var info = new WorkerInfo("worker-1", WorkerHealthState.HEALTHY, capabilities, metrics, Instant.now());
 
         String json = mapper.writeValueAsString(info);
@@ -60,12 +60,12 @@ class WorkerInfoTest {
 
     @Test
     void workerMetricsRoundTrip() throws Exception {
-        var metrics = new WorkerMetrics(88.5, 72.3, 5, 2, 15.0, 180.0);
+        var metrics = new WorkerMetrics(88.5, 3072, 8192, 32, 5, 200L, 3L, 180.0, Instant.now());
 
         String json = mapper.writeValueAsString(metrics);
         WorkerMetrics deserialized = mapper.readValue(json, WorkerMetrics.class);
 
-        assertThat(deserialized.cpuUtilization()).isEqualTo(88.5);
+        assertThat(deserialized.cpuUsagePercent()).isEqualTo(88.5);
         assertThat(deserialized.activeTaskCount()).isEqualTo(5);
     }
 }

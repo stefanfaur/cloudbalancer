@@ -85,14 +85,20 @@ class EventSerializationTest {
 
     @Test
     void workerHeartbeatEventRoundTrip() throws Exception {
-        var metrics = new WorkerMetrics(45.0, 60.0, 2, 0, 10.0, 200.0);
         var event = new WorkerHeartbeatEvent(
-            UUID.randomUUID().toString(), Instant.now(), "worker-1", metrics
+            UUID.randomUUID().toString(), Instant.now(), "worker-1", WorkerHealthState.HEALTHY
         );
 
         String json = mapper.writeValueAsString(event);
+        assertThat(json).contains("\"eventType\":\"WORKER_HEARTBEAT\"");
+        assertThat(json).contains("\"workerId\"");
+        assertThat(json).contains("\"healthState\"");
+
         CloudBalancerEvent deserialized = mapper.readValue(json, CloudBalancerEvent.class);
         assertThat(deserialized).isInstanceOf(WorkerHeartbeatEvent.class);
+        WorkerHeartbeatEvent typed = (WorkerHeartbeatEvent) deserialized;
+        assertThat(typed.workerId()).isEqualTo("worker-1");
+        assertThat(typed.healthState()).isEqualTo(WorkerHealthState.HEALTHY);
     }
 
     @Test
