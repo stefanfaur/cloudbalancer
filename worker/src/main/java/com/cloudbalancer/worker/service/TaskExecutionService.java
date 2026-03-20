@@ -1,0 +1,90 @@
+package com.cloudbalancer.worker.service;
+
+import com.cloudbalancer.common.executor.*;
+import com.cloudbalancer.common.model.*;
+import com.cloudbalancer.common.util.JsonUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.stereotype.Service;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.*;
+
+@Service
+public class TaskExecutionService {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskExecutionService.class);
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final String workerId;
+    private final Map<ExecutorType, TaskExecutor> executors;
+    private final ExecutorService threadPool = Executors.newCachedThreadPool();
+
+    public TaskExecutionService(KafkaTemplate<String, String> kafkaTemplate,
+                                 @Value("${cloudbalancer.worker.id:worker-1}") String workerId) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.workerId = workerId;
+        this.executors = Map.of(ExecutorType.SIMULATED, new SimulatedExecutor());
+    }
+
+    public void executeTask(TaskAssignment assignment) {
+        TaskDescriptor descriptor = assignment.descriptor();
+        TaskExecutor executor = executors.get(descriptor.executorType());
+        if (executor == null) {
+            publishResult(assignment.taskId(), new TaskResult(
+                assignment.taskId(), workerId, 1, "",
+                "No executor for type: " + descriptor.executorType(), 0, false, Instant.now()
+            ));
+            return;
+        }
+
+        int timeoutSeconds = descriptor.executionPolicy() != null
+            ? descriptor.executionPolicy().timeoutSeconds() : 300;
+
+        var allocation = new ResourceAllocation(
+            descriptor.resourceProfile() != null ? descriptor.resourceProfile().cpuCores() : 1,
+            descriptor.resourceProfile() != null ? descriptor.resourceProfile().memoryMB() : 512,
+            descriptor.resourceProfile() != null ? descriptor.resourceProfile().diskMB() : 256
+        );
+        var context = new TaskContext(assignment.taskId(), Path.of(System.getProperty("java.io.tmpdir")));
+
+        Future<ExecutionResult> future = threadPool.submit(() ->
+            executor.execute(descriptor.executionSpec(), allocation, context)
+        );
+
+        try {
+            ExecutionResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
+            publishResult(assignment.taskId(), new TaskResult(
+                assignment.taskId(), workerId, result.exitCode(),
+                result.stdout(), result.stderr(), result.durationMs(),
+                result.timedOut(), Instant.now()
+            ));
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            publishResult(assignment.taskId(), new TaskResult(
+                assignment.taskId(), workerId, 1, "",
+                "Execution timed out after " + timeoutSeconds + "s",
+                timeoutSeconds * 1000L, true, Instant.now()
+            ));
+        } catch (Exception e) {
+            publishResult(assignment.taskId(), new TaskResult(
+                assignment.taskId(), workerId, 1, "",
+                "Execution error: " + e.getMessage(), 0, false, Instant.now()
+            ));
+        }
+    }
+
+    private void publishResult(UUID taskId, TaskResult result) {
+        try {
+            String json = JsonUtil.mapper().writeValueAsString(result);
+            kafkaTemplate.send("tasks.results", taskId.toString(), json);
+            log.info("Published result for task {}: exitCode={}, timedOut={}", taskId, result.exitCode(), result.timedOut());
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize task result", e);
+        }
+    }
+}
