@@ -26,9 +26,21 @@ public class TestWorkerSimulator implements AutoCloseable {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ObjectMapper mapper = JsonUtil.mapper();
     private volatile boolean running = true;
+    private final Set<ExecutorType> supportedExecutorTypes;
+    private final Map<ExecutorType, TaskExecutor> executors;
 
+    /** Original constructor — backward compatible, supports only SIMULATED. */
     public TestWorkerSimulator(String workerId, String bootstrapServers) {
+        this(workerId, bootstrapServers, Set.of(ExecutorType.SIMULATED), Map.of(ExecutorType.SIMULATED, new SimulatedExecutor()));
+    }
+
+    /** Extended constructor — supports configurable executor types. */
+    public TestWorkerSimulator(String workerId, String bootstrapServers,
+                               Set<ExecutorType> supportedExecutorTypes,
+                               Map<ExecutorType, TaskExecutor> executors) {
         this.workerId = workerId;
+        this.supportedExecutorTypes = supportedExecutorTypes;
+        this.executors = executors;
         this.producer = createProducer(bootstrapServers);
         this.consumer = createConsumer(bootstrapServers);
     }
@@ -36,7 +48,7 @@ public class TestWorkerSimulator implements AutoCloseable {
     public void start() throws Exception {
         // Register
         var caps = new WorkerCapabilities(
-            Set.of(ExecutorType.SIMULATED),
+            supportedExecutorTypes,
             new ResourceProfile(4, 8192, 10240, false, 0, true),
             Set.of()
         );
@@ -68,7 +80,11 @@ public class TestWorkerSimulator implements AutoCloseable {
     private void processAssignment(String value) {
         try {
             TaskAssignment assignment = mapper.readValue(value, TaskAssignment.class);
-            SimulatedExecutor simExec = new SimulatedExecutor();
+            ExecutorType type = assignment.descriptor().executorType();
+            TaskExecutor taskExec = executors.get(type);
+            if (taskExec == null) {
+                taskExec = new SimulatedExecutor(); // fallback
+            }
             var allocation = new ResourceAllocation(1, 512, 256);
             var context = new TaskContext(assignment.taskId(), Path.of(System.getProperty("java.io.tmpdir")));
 
@@ -76,9 +92,10 @@ public class TestWorkerSimulator implements AutoCloseable {
                 ? assignment.descriptor().executionPolicy().timeoutSeconds() : 300;
             ExecutionResult result;
             ExecutorService taskRunner = Executors.newSingleThreadExecutor();
+            final TaskExecutor finalExec = taskExec;
             try {
                 Future<ExecutionResult> future = taskRunner.submit(() ->
-                    simExec.execute(assignment.descriptor().executionSpec(), allocation, context)
+                    finalExec.execute(assignment.descriptor().executionSpec(), allocation, context)
                 );
                 result = future.get(timeout, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
