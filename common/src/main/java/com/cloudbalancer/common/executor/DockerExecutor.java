@@ -14,6 +14,7 @@ import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.StreamType;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -111,31 +112,38 @@ public class DockerExecutor implements TaskExecutor {
             // Start container
             dockerClient.startContainerCmd(containerId).exec();
 
+            // Stream logs DURING execution so the callback receives lines in real-time
+            StringBuilder stdout = new StringBuilder();
+            StringBuilder stderr = new StringBuilder();
+            LogCallback logCb = context.logCallback();
+
+            var logCbAdapter = new ResultCallback.Adapter<Frame>() {
+                @Override
+                public void onNext(Frame frame) {
+                    String payload = new String(frame.getPayload()).stripTrailing();
+                    if (frame.getStreamType() == StreamType.STDOUT) {
+                        stdout.append(payload).append('\n');
+                        if (logCb != null) logCb.onLogLine(payload, false, Instant.now());
+                    } else if (frame.getStreamType() == StreamType.STDERR) {
+                        stderr.append(payload).append('\n');
+                        if (logCb != null) logCb.onLogLine(payload, true, Instant.now());
+                    }
+                }
+            };
+
+            dockerClient.logContainerCmd(containerId)
+                    .withStdOut(true)
+                    .withStdErr(true)
+                    .withFollowStream(true)
+                    .exec(logCbAdapter);
+
             // Wait for container to finish
             int exitCode = dockerClient.waitContainerCmd(containerId)
                     .start()
                     .awaitStatusCode(300, TimeUnit.SECONDS);
 
-            // Collect logs
-            StringBuilder stdout = new StringBuilder();
-            StringBuilder stderr = new StringBuilder();
-
-            dockerClient.logContainerCmd(containerId)
-                    .withStdOut(true)
-                    .withStdErr(true)
-                    .withFollowStream(false)
-                    .exec(new ResultCallback.Adapter<Frame>() {
-                        @Override
-                        public void onNext(Frame frame) {
-                            String payload = new String(frame.getPayload());
-                            if (frame.getStreamType() == StreamType.STDOUT) {
-                                stdout.append(payload);
-                            } else if (frame.getStreamType() == StreamType.STDERR) {
-                                stderr.append(payload);
-                            }
-                        }
-                    })
-                    .awaitCompletion(30, TimeUnit.SECONDS);
+            // Wait for log stream to complete
+            logCbAdapter.awaitCompletion(30, TimeUnit.SECONDS);
 
             long elapsed = System.currentTimeMillis() - start;
             return new ExecutionResult(exitCode, stdout.toString(), stderr.toString(), elapsed, false);

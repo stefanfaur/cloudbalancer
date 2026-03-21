@@ -17,6 +17,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -146,6 +147,26 @@ class DockerExecutorTest {
         assertThat(result.exitCode()).isEqualTo(0);
         assertThat(result.succeeded()).isTrue();
         assertThat(result.stdout()).contains("network-test");
+    }
+
+    // ---- Streaming log callback test ----
+
+    @Test
+    void executeInvokesLogCallbackWithContainerOutput(@TempDir Path workDir) {
+        List<String> capturedLines = new ArrayList<>();
+        LogCallback callback = (line, isStderr, ts) -> capturedLines.add(line);
+
+        Map<String, Object> spec = Map.of(
+                "image", "alpine:latest",
+                "command", List.of("sh", "-c", "echo line1 && echo line2")
+        );
+        var allocation = new ResourceAllocation(1, 256, 100);
+        var context = new TaskContext(UUID.randomUUID(), workDir, callback);
+
+        ExecutionResult result = executor.execute(spec, allocation, context);
+
+        assertThat(result.exitCode()).isEqualTo(0);
+        assertThat(capturedLines).contains("line1", "line2");
     }
 
     // ---- Resource estimation test ----
