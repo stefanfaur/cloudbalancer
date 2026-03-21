@@ -7,7 +7,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -194,5 +196,51 @@ class ShellExecutorTest {
         assertThat(estimate.estimatedCpuCores()).isGreaterThan(0);
         assertThat(estimate.estimatedMemoryMB()).isGreaterThan(0);
         assertThat(estimate.estimatedDurationMs()).isGreaterThan(0);
+    }
+
+    // ---- LogCallback streaming tests ----
+
+    @Test
+    void executeInvokesLogCallbackPerLine(@TempDir Path workDir) {
+        List<String> capturedLines = new ArrayList<>();
+        LogCallback callback = (line, isStderr, ts) -> capturedLines.add(line);
+
+        Map<String, Object> spec = Map.of("command", "echo line1 && echo line2");
+        var allocation = new ResourceAllocation(1, 256, 100);
+        var context = new TaskContext(UUID.randomUUID(), workDir, callback);
+
+        ExecutionResult result = executor.execute(spec, allocation, context);
+
+        assertThat(result.exitCode()).isEqualTo(0);
+        assertThat(capturedLines).contains("line1", "line2");
+    }
+
+    @Test
+    void executeCallbackReceivesStderrLines(@TempDir Path workDir) {
+        List<String> stderrLines = new ArrayList<>();
+        LogCallback callback = (line, isStderr, ts) -> {
+            if (isStderr) stderrLines.add(line);
+        };
+
+        Map<String, Object> spec = Map.of("command", "echo error >&2");
+        var allocation = new ResourceAllocation(1, 256, 100);
+        var context = new TaskContext(UUID.randomUUID(), workDir, callback);
+
+        ExecutionResult result = executor.execute(spec, allocation, context);
+
+        assertThat(stderrLines).isNotEmpty();
+        assertThat(stderrLines.get(0)).contains("error");
+    }
+
+    @Test
+    void executeWithoutCallbackStillCapturesOutput(@TempDir Path workDir) {
+        Map<String, Object> spec = Map.of("command", "echo hello");
+        var allocation = new ResourceAllocation(1, 256, 100);
+        var context = new TaskContext(UUID.randomUUID(), workDir); // null callback
+
+        ExecutionResult result = executor.execute(spec, allocation, context);
+
+        assertThat(result.exitCode()).isEqualTo(0);
+        assertThat(result.stdout()).contains("hello");
     }
 }

@@ -5,10 +5,13 @@ import com.cloudbalancer.common.model.ExecutorType;
 import com.cloudbalancer.common.model.ResourceProfile;
 import com.cloudbalancer.common.model.SecurityLevel;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -72,12 +75,13 @@ public class ShellExecutor implements TaskExecutor {
         runningProcesses.put(context.taskId(), process);
 
         try {
-            // Capture stdout and stderr on separate threads
+            // Capture stdout and stderr on separate threads with line-by-line callback
+            LogCallback callback = context.logCallback();
             CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(
-                () -> readStream(process.getInputStream())
+                () -> readStreamWithCallback(process.getInputStream(), false, callback)
             );
             CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(
-                () -> readStream(process.getErrorStream())
+                () -> readStreamWithCallback(process.getErrorStream(), true, callback)
             );
 
             int exitCode = process.waitFor();
@@ -144,20 +148,23 @@ public class ShellExecutor implements TaskExecutor {
         }
     }
 
-    private String readStream(InputStream inputStream) {
-        try {
+    private String readStreamWithCallback(InputStream inputStream, boolean isStderr,
+                                          LogCallback callback) {
+        try (var reader = new BufferedReader(
+                new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             StringBuilder sb = new StringBuilder();
-            byte[] buffer = new byte[8192];
-            int bytesRead;
+            String line;
             int totalBytes = 0;
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                int remaining = maxOutputBytes - totalBytes;
-                if (remaining <= 0) {
-                    break;
+            while ((line = reader.readLine()) != null) {
+                if (callback != null) {
+                    callback.onLogLine(line, isStderr, Instant.now());
                 }
-                int toAppend = Math.min(bytesRead, remaining);
-                sb.append(new String(buffer, 0, toAppend, StandardCharsets.UTF_8));
-                totalBytes += toAppend;
+                int lineBytes = line.length() + 1; // +1 for the newline
+                if (totalBytes + lineBytes <= maxOutputBytes) {
+                    if (sb.length() > 0) sb.append('\n');
+                    sb.append(line);
+                    totalBytes += lineBytes;
+                }
             }
             return sb.toString();
         } catch (IOException e) {
