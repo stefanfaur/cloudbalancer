@@ -15,10 +15,15 @@ spring:
 cloudbalancer:
   worker:
     id: ${WORKER_ID:worker-1}
-    supported-executors: SIMULATED
+    supported-executors: SIMULATED,SHELL
     cpu-cores: 4
     memory-mb: 8192
     disk-mb: 10240
     tags: []
     metrics-interval-ms: 5000
     heartbeat-interval-ms: 10000
+    shell:
+      blocked-commands: "rm -rf /,shutdown,reboot,mkfs,dd,:(){ :|:& };:"
+      max-output-bytes: 1048576
+    docker:
+      host: unix:///var/run/docker.sock
