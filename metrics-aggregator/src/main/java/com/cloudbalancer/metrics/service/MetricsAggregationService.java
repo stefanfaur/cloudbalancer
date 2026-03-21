@@ -68,7 +68,7 @@ public class MetricsAggregationService {
         }
 
         // Use TimescaleDB time_bucket for aggregation
-        String sql = "SELECT time_bucket(:interval, reported_at) AS bucket, " +
+        String sql = "SELECT time_bucket(CAST(:interval AS INTERVAL), reported_at) AS bucket, " +
                 "worker_id, " +
                 "AVG(cpu_usage_percent) AS avg_cpu, " +
                 "AVG(heap_used_mb) AS avg_heap_used, " +

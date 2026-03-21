@@ -193,7 +193,8 @@ class MetricsControllerTest {
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         assertThat(body.isArray()).isTrue();
-        assertThat(body.size()).isEqualTo(2);
+        // TimescaleDB time_bucket aligns to epoch boundaries, so 2 or 3 buckets depending on alignment
+        assertThat(body.size()).isBetween(2, 3);
 
         // Each bucket should have averaged values
         for (JsonNode bucket : body) {
