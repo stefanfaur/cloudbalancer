@@ -1,4 +1,4 @@
-package com.cloudbalancer.metrics.controller;
+package com.cloudbalancer.metrics.api;
 
 import com.cloudbalancer.metrics.api.dto.ClusterMetrics;
 import com.cloudbalancer.metrics.api.dto.WorkerMetricsBucket;
@@ -52,13 +52,10 @@ public class MetricsController {
         return aggregationService.getClusterMetrics();
     }
 
-    /**
-     * Parses bucket string like "5m", "1h", "1m" to minutes.
-     */
     private int parseBucketToMinutes(String bucket) {
         Matcher m = BUCKET_PATTERN.matcher(bucket);
         if (!m.matches()) {
-            return 1; // default to raw
+            return 1;
         }
         int value = Integer.parseInt(m.group(1));
         String unit = m.group(2);
