@@ -45,6 +45,7 @@ resilience4j-spring-boot3 = { module = "io.github.resilience4j:resilience4j-spri
 resilience4j-micrometer = { module = "io.github.resilience4j:resilience4j-micrometer", version.ref = "resilience4j" }
 docker-java-core = { module = "com.github.docker-java:docker-java-core", version.ref = "docker-java" }
 docker-java-transport = { module = "com.github.docker-java:docker-java-transport-httpclient5", version.ref = "docker-java" }
+spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
