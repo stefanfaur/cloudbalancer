@@ -1,6 +1,7 @@
 package com.cloudbalancer.worker.config;
 
 import com.cloudbalancer.common.executor.DockerExecutor;
+import com.cloudbalancer.common.executor.PythonExecutor;
 import com.cloudbalancer.common.executor.ShellExecutor;
 import com.cloudbalancer.common.executor.SimulatedExecutor;
 import com.cloudbalancer.common.executor.TaskExecutor;
@@ -115,6 +116,17 @@ class ExecutorConfigTest {
         assertThat(types).containsExactlyInAnyOrder(
                 ExecutorType.SIMULATED, ExecutorType.SHELL, ExecutorType.DOCKER
         );
+    }
+
+    @Test
+    void whenPythonConfigured_thenPythonExecutorCreated() {
+        WorkerProperties props = buildProperties(Set.of(ExecutorType.PYTHON));
+
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.empty());
+
+        assertThat(executors).hasSize(1);
+        assertThat(executors.get(0)).isInstanceOf(PythonExecutor.class);
+        assertThat(executors.get(0).getExecutorType()).isEqualTo(ExecutorType.PYTHON);
     }
 
     private WorkerProperties buildProperties(Set<ExecutorType> executorTypes) {

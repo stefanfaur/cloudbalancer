@@ -1,6 +1,7 @@
 package com.cloudbalancer.worker.config;
 
 import com.cloudbalancer.common.executor.DockerExecutor;
+import com.cloudbalancer.common.executor.PythonExecutor;
 import com.cloudbalancer.common.executor.ShellExecutor;
 import com.cloudbalancer.common.executor.SimulatedExecutor;
 import com.cloudbalancer.common.executor.TaskExecutor;
@@ -46,6 +47,8 @@ public class ExecutorConfig {
                         props.getShell().getMaxOutputBytes()));
                 case DOCKER -> dockerClient.ifPresent(dc ->
                         executors.add(new DockerExecutor(dc)));
+                case PYTHON -> executors.add(new PythonExecutor(
+                        props.getPython().getPythonBinary()));
                 default -> { /* unsupported executor types are ignored */ }
             }
         }

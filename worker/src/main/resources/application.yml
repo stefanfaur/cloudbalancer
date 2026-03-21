@@ -27,3 +27,9 @@ cloudbalancer:
       max-output-bytes: 1048576
     docker:
       host: unix:///var/run/docker.sock
+    python:
+      python-binary: python3
+      network-isolation: true
+    artifacts:
+      max-size-bytes: 104857600
+      dispatcher-url: ${DISPATCHER_URL:http://localhost:8080}

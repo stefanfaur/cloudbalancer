@@ -18,6 +18,8 @@ public class WorkerProperties {
     private long heartbeatIntervalMs = 10000;
     private ShellConfig shell = new ShellConfig();
     private DockerConfig docker = new DockerConfig();
+    private PythonConfig python = new PythonConfig();
+    private ArtifactConfig artifacts = new ArtifactConfig();
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -39,6 +41,10 @@ public class WorkerProperties {
     public void setShell(ShellConfig shell) { this.shell = shell; }
     public DockerConfig getDocker() { return docker; }
     public void setDocker(DockerConfig docker) { this.docker = docker; }
+    public PythonConfig getPython() { return python; }
+    public void setPython(PythonConfig python) { this.python = python; }
+    public ArtifactConfig getArtifacts() { return artifacts; }
+    public void setArtifacts(ArtifactConfig artifacts) { this.artifacts = artifacts; }
 
     public static class ShellConfig {
         private Set<String> blockedCommands = Set.of(
@@ -57,5 +63,25 @@ public class WorkerProperties {
 
         public String getHost() { return host; }
         public void setHost(String host) { this.host = host; }
+    }
+
+    public static class PythonConfig {
+        private String pythonBinary = "python3";
+        private boolean networkIsolation = true;
+
+        public String getPythonBinary() { return pythonBinary; }
+        public void setPythonBinary(String pythonBinary) { this.pythonBinary = pythonBinary; }
+        public boolean isNetworkIsolation() { return networkIsolation; }
+        public void setNetworkIsolation(boolean networkIsolation) { this.networkIsolation = networkIsolation; }
+    }
+
+    public static class ArtifactConfig {
+        private long maxSizeBytes = 104_857_600; // 100 MB
+        private String dispatcherUrl = "http://localhost:8080";
+
+        public long getMaxSizeBytes() { return maxSizeBytes; }
+        public void setMaxSizeBytes(long maxSizeBytes) { this.maxSizeBytes = maxSizeBytes; }
+        public String getDispatcherUrl() { return dispatcherUrl; }
+        public void setDispatcherUrl(String dispatcherUrl) { this.dispatcherUrl = dispatcherUrl; }
     }
 }
