@@ -47,6 +47,8 @@ public class DockerExecutor implements TaskExecutor {
 
         Long memoryLimitBytes = spec.containsKey("memoryLimitBytes")
                 ? ((Number) spec.get("memoryLimitBytes")).longValue() : null;
+        Long memorySwapBytes = spec.containsKey("memorySwapBytes")
+                ? ((Number) spec.get("memorySwapBytes")).longValue() : null;
         Integer cpuCount = spec.containsKey("cpuCount")
                 ? ((Number) spec.get("cpuCount")).intValue() : null;
         Boolean readOnlyRootfs = (Boolean) spec.get("readOnlyRootfs");
@@ -68,6 +70,9 @@ public class DockerExecutor implements TaskExecutor {
 
             if (memoryLimitBytes != null) {
                 hostConfig.withMemory(memoryLimitBytes);
+            }
+            if (memorySwapBytes != null) {
+                hostConfig.withMemorySwap(memorySwapBytes);
             }
             if (cpuCount != null) {
                 hostConfig.withCpuCount((long) cpuCount);

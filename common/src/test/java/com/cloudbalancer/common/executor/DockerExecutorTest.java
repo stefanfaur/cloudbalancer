@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -156,5 +158,103 @@ class DockerExecutorTest {
         assertThat(estimate.estimatedCpuCores()).isEqualTo(1);
         assertThat(estimate.estimatedMemoryMB()).isEqualTo(512);
         assertThat(estimate.estimatedDurationMs()).isEqualTo(120_000L);
+    }
+
+    // ---- Resource limit, cancel, cleanup, and read-only rootfs tests ----
+
+    @Test
+    void executeWithMemoryLimitKillsOOMContainer(@TempDir Path workDir) {
+        Map<String, Object> spec = new HashMap<>();
+        spec.put("image", "alpine:latest");
+        // Use a shell variable to accumulate data in memory until OOM
+        // This creates a growing string in shell memory, exceeding the 64MB limit
+        spec.put("command", List.of("sh", "-c",
+                "x=$(cat /dev/zero | tr '\\0' 'A' | head -c 128000000); echo $x > /dev/null"));
+        spec.put("memoryLimitBytes", 67108864L); // 64MB
+        // Also disable swap so OOM killer triggers promptly
+        spec.put("memorySwapBytes", 67108864L);
+
+        var allocation = new ResourceAllocation(1, 64, 100);
+        var context = new TaskContext(UUID.randomUUID(), workDir);
+
+        ExecutionResult result = executor.execute(spec, allocation, context);
+
+        // Container should be OOM-killed (exit code 137) or otherwise fail
+        assertThat(result.succeeded()).isFalse();
+        assertThat(result.exitCode()).isNotEqualTo(0);
+    }
+
+    @Test
+    void cancelKillsRunningContainerAndReturnsNonZero(@TempDir Path workDir) throws Exception {
+        Map<String, Object> spec = new HashMap<>();
+        spec.put("image", "alpine:latest");
+        spec.put("command", List.of("sleep", "300"));
+
+        var allocation = new ResourceAllocation(1, 256, 100);
+        UUID taskId = UUID.randomUUID();
+        var context = new TaskContext(taskId, workDir);
+
+        // Run execute in background
+        CompletableFuture<ExecutionResult> future = CompletableFuture.supplyAsync(
+                () -> executor.execute(spec, allocation, context));
+
+        // Give the container time to start
+        Thread.sleep(2000);
+
+        // Cancel the running container
+        executor.cancel(new ExecutionHandle(taskId.toString()));
+
+        // execute() should return within a reasonable time with a non-zero exit
+        ExecutionResult result = future.get(30, TimeUnit.SECONDS);
+        assertThat(result.succeeded()).isFalse();
+        assertThat(result.exitCode()).isNotEqualTo(0);
+
+        // Container should be cleaned up
+        List<com.github.dockerjava.api.model.Container> remaining = dockerClient.listContainersCmd()
+                .withShowAll(true)
+                .withLabelFilter(Map.of("cloudbalancer.task-id", taskId.toString()))
+                .exec();
+        assertThat(remaining).isEmpty();
+    }
+
+    @Test
+    void containerCleanedUpAfterBadEntrypoint(@TempDir Path workDir) {
+        UUID taskId = UUID.randomUUID();
+        Map<String, Object> spec = new HashMap<>();
+        spec.put("image", "alpine:latest");
+        spec.put("command", List.of("/nonexistent/binary"));
+
+        var allocation = new ResourceAllocation(1, 256, 100);
+        var context = new TaskContext(taskId, workDir);
+
+        ExecutionResult result = executor.execute(spec, allocation, context);
+
+        // The command should fail
+        assertThat(result.succeeded()).isFalse();
+        assertThat(result.exitCode()).isNotEqualTo(0);
+
+        // No orphaned containers with our task label should remain
+        List<com.github.dockerjava.api.model.Container> remaining = dockerClient.listContainersCmd()
+                .withShowAll(true)
+                .withLabelFilter(Map.of("cloudbalancer.task-id", taskId.toString()))
+                .exec();
+        assertThat(remaining).isEmpty();
+    }
+
+    @Test
+    void executeWithReadOnlyRootfsFailsOnWrite(@TempDir Path workDir) {
+        Map<String, Object> spec = new HashMap<>();
+        spec.put("image", "alpine:latest");
+        spec.put("command", List.of("sh", "-c", "echo test > /tmp/file"));
+        spec.put("readOnlyRootfs", true);
+
+        var allocation = new ResourceAllocation(1, 256, 100);
+        var context = new TaskContext(UUID.randomUUID(), workDir);
+
+        ExecutionResult result = executor.execute(spec, allocation, context);
+
+        // Write to read-only filesystem should fail
+        assertThat(result.succeeded()).isFalse();
+        assertThat(result.exitCode()).isNotEqualTo(0);
     }
 }
