@@ -2,6 +2,7 @@
 spring-boot = "4.0.3"
 testcontainers = "2.0.3"
 jjwt = "0.12.6"
+docker-java = "3.4.1"
 bucket4j = "8.16.1"
 resilience4j = "2.1.0"
 postgresql = "42.7.4"
@@ -42,6 +43,8 @@ spring-boot-flyway = { module = "org.springframework.boot:spring-boot-flyway" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 resilience4j-spring-boot3 = { module = "io.github.resilience4j:resilience4j-spring-boot3", version.ref = "resilience4j" }
 resilience4j-micrometer = { module = "io.github.resilience4j:resilience4j-micrometer", version.ref = "resilience4j" }
+docker-java-core = { module = "com.github.docker-java:docker-java-core", version.ref = "docker-java" }
+docker-java-transport = { module = "com.github.docker-java:docker-java-transport-httpclient5", version.ref = "docker-java" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
