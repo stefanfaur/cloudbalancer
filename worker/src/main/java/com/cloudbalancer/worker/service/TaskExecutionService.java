@@ -14,11 +14,13 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Service
 public class TaskExecutionService {
@@ -40,12 +42,14 @@ public class TaskExecutionService {
     public TaskExecutionService(KafkaTemplate<String, String> kafkaTemplate,
                                  @Value("${cloudbalancer.worker.id:worker-1}") String workerId,
                                  @Qualifier("workerResultProducerCircuitBreaker") CircuitBreaker circuitBreaker,
-                                 WorkerChaosService workerChaosService) {
+                                 WorkerChaosService workerChaosService,
+                                 List<TaskExecutor> executorList) {
         this.kafkaTemplate = kafkaTemplate;
         this.workerId = workerId;
         this.circuitBreaker = circuitBreaker;
         this.workerChaosService = workerChaosService;
-        this.executors = Map.of(ExecutorType.SIMULATED, new SimulatedExecutor());
+        this.executors = executorList.stream()
+            .collect(Collectors.toMap(TaskExecutor::getExecutorType, e -> e));
     }
 
     public void executeTask(TaskAssignment assignment) {
@@ -99,6 +103,7 @@ public class TaskExecutionService {
             }
         } catch (TimeoutException e) {
             future.cancel(true);
+            executor.cancel(new ExecutionHandle(assignment.taskId().toString()));
             failedTaskCount.incrementAndGet();
             publishResult(assignment.taskId(), new TaskResult(
                 assignment.taskId(), workerId, 1, "",

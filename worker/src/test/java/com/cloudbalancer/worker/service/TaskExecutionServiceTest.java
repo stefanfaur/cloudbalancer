@@ -10,7 +10,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
+import com.cloudbalancer.common.executor.SimulatedExecutor;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +38,7 @@ class TaskExecutionServiceTest {
 
     @Test
     void executesTaskAndPublishesSuccessResult() throws Exception {
-        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService);
+        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 100, "failProbability", 0.0),
             new ResourceProfile(1, 512, 256, false, 10, false),
@@ -59,7 +61,7 @@ class TaskExecutionServiceTest {
 
     @Test
     void executesTaskAndPublishesFailureResult() throws Exception {
-        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService);
+        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 100, "failProbability", 1.0),
             new ResourceProfile(1, 512, 256, false, 10, false),
@@ -80,7 +82,7 @@ class TaskExecutionServiceTest {
 
     @Test
     void respectsExecutionTimeout() throws Exception {
-        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService);
+        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 30000, "failProbability", 0.0),
             new ResourceProfile(1, 512, 256, false, 10, false),

@@ -1,5 +1,6 @@
 package com.cloudbalancer.worker.service;
 
+import com.cloudbalancer.common.executor.SimulatedExecutor;
 import com.cloudbalancer.common.model.*;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +40,7 @@ class TaskExecutionServiceCounterTest {
             ((Runnable) invocation.getArgument(0)).run();
             return null;
         }).when(circuitBreaker).executeRunnable(any(Runnable.class));
-        service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService);
+        service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
     }
 
     private TaskAssignment createAssignment(int durationMs, double failProbability) {
