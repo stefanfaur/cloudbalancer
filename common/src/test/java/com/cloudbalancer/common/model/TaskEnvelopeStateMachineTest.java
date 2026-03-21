@@ -171,7 +171,7 @@ class TaskEnvelopeStateMachineTest {
     // --- Terminal state detection ---
 
     @ParameterizedTest
-    @EnumSource(value = TaskState.class, names = {"COMPLETED", "FAILED", "TIMED_OUT", "CANCELLED"})
+    @EnumSource(value = TaskState.class, names = {"COMPLETED", "FAILED", "TIMED_OUT", "CANCELLED", "DEAD_LETTERED"})
     void terminalStatesAreTerminal(TaskState state) {
         assertThat(state.isTerminal()).isTrue();
     }
@@ -207,7 +207,7 @@ class TaskEnvelopeStateMachineTest {
         envelope.transitionTo(TaskState.QUEUED);
         envelope.transitionTo(TaskState.ASSIGNED);
 
-        var attempt = new ExecutionAttempt(1, "worker-1", java.time.Instant.now(), null, -1, null);
+        var attempt = new ExecutionAttempt(1, "worker-1", java.time.Instant.now(), null, -1, null, null, false, null);
         envelope.addAttempt(attempt);
 
         assertThat(envelope.getExecutionHistory()).hasSize(1);

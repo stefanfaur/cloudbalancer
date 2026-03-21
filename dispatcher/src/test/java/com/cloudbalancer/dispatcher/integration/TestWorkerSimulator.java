@@ -90,7 +90,7 @@ public class TestWorkerSimulator implements AutoCloseable {
             var taskResult = new TaskResult(
                 assignment.taskId(), workerId, result.exitCode(),
                 result.stdout(), result.stderr(), result.durationMs(),
-                result.timedOut(), Instant.now()
+                result.timedOut(), Instant.now(), assignment.executionId()
             );
             producer.send(new ProducerRecord<>("tasks.results", assignment.taskId().toString(),
                 mapper.writeValueAsString(taskResult))).get();

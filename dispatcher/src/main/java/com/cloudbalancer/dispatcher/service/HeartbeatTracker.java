@@ -19,15 +19,18 @@ public class HeartbeatTracker {
     private static final Logger log = LoggerFactory.getLogger(HeartbeatTracker.class);
 
     private final WorkerRepository workerRepository;
+    private final WorkerFailureHandler workerFailureHandler;
     private final ConcurrentHashMap<String, Instant> lastSeenAt = new ConcurrentHashMap<>();
     private final long suspectThresholdSeconds;
     private final long deadThresholdSeconds;
 
     public HeartbeatTracker(
             WorkerRepository workerRepository,
+            WorkerFailureHandler workerFailureHandler,
             @Value("${cloudbalancer.dispatcher.heartbeat-suspect-threshold-seconds:30}") long suspectThresholdSeconds,
             @Value("${cloudbalancer.dispatcher.heartbeat-dead-threshold-seconds:60}") long deadThresholdSeconds) {
         this.workerRepository = workerRepository;
+        this.workerFailureHandler = workerFailureHandler;
         this.suspectThresholdSeconds = suspectThresholdSeconds;
         this.deadThresholdSeconds = deadThresholdSeconds;
     }
@@ -40,6 +43,7 @@ public class HeartbeatTracker {
                 workerRepository.save(worker);
                 log.info("Worker {} recovered: SUSPECT -> HEALTHY", workerId);
             }
+            // RECOVERING workers: heartbeat is tracked but state promotion happens in checkLiveness()
         });
     }
 
@@ -47,6 +51,19 @@ public class HeartbeatTracker {
     public void checkLiveness() {
         Instant now = Instant.now();
         for (WorkerRecord worker : workerRepository.findAll()) {
+            // Promote RECOVERING -> HEALTHY after 60s
+            if (worker.getHealthState() == WorkerHealthState.RECOVERING
+                    && worker.getRecoveryStartedAt() != null) {
+                long recoverySeconds = Duration.between(worker.getRecoveryStartedAt(), now).getSeconds();
+                if (recoverySeconds >= 60) {
+                    worker.setHealthState(WorkerHealthState.HEALTHY);
+                    worker.setRecoveryStartedAt(null);
+                    workerRepository.save(worker);
+                    log.info("Worker {} promoted: RECOVERING -> HEALTHY after {}s", worker.getId(), recoverySeconds);
+                    continue;  // Skip further checks for this worker
+                }
+            }
+
             Instant lastSeen = lastSeenAt.getOrDefault(worker.getId(), worker.getRegisteredAt());
             long secondsSinceLastSeen = Duration.between(lastSeen, now).getSeconds();
 
@@ -56,6 +73,8 @@ public class HeartbeatTracker {
                 workerRepository.save(worker);
                 log.info("Worker {} transitioned to DEAD ({}s since last seen)",
                         worker.getId(), secondsSinceLastSeen);
+                // Trigger failure handler to re-queue in-flight tasks
+                workerFailureHandler.onWorkerDead(worker.getId());
             } else if (secondsSinceLastSeen >= suspectThresholdSeconds
                     && worker.getHealthState() == WorkerHealthState.HEALTHY) {
                 worker.setHealthState(WorkerHealthState.SUSPECT);

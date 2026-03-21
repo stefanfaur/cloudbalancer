@@ -16,6 +16,8 @@ dependencies {
     runtimeOnly(libs.jjwt.impl)
     runtimeOnly(libs.jjwt.jackson)
     implementation(libs.bucket4j.core)
+    implementation(libs.resilience4j.spring.boot3)
+    implementation(libs.resilience4j.micrometer)
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.boot.webmvc.test)

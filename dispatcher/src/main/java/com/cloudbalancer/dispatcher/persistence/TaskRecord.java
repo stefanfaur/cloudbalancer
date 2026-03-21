@@ -50,6 +50,12 @@ public class TaskRecord {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "retry_eligible_at")
+    private Instant retryEligibleAt;
+
+    @Column(name = "current_execution_id", columnDefinition = "uuid")
+    private UUID currentExecutionId;
+
     protected TaskRecord() {}
 
     public static TaskRecord create(TaskDescriptor descriptor) {
@@ -61,6 +67,7 @@ public class TaskRecord {
         record.submittedAt = Instant.now();
         record.descriptor = descriptor;
         record.executionHistory = new ArrayList<>();
+        record.currentExecutionId = UUID.randomUUID();
         return record;
     }
 
@@ -86,6 +93,10 @@ public class TaskRecord {
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
+    public Instant getRetryEligibleAt() { return retryEligibleAt; }
+    public void setRetryEligibleAt(Instant retryEligibleAt) { this.retryEligibleAt = retryEligibleAt; }
+    public UUID getCurrentExecutionId() { return currentExecutionId; }
+    public void setCurrentExecutionId(UUID currentExecutionId) { this.currentExecutionId = currentExecutionId; }
 
     public void addAttempt(ExecutionAttempt attempt) {
         this.executionHistory.add(attempt);

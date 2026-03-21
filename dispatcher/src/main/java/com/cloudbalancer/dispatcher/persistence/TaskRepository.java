@@ -14,4 +14,6 @@ public interface TaskRepository extends JpaRepository<TaskRecord, UUID> {
     List<TaskRecord> findByAssignedWorkerId(String workerId);
 
     List<TaskRecord> findByStateIn(Collection<TaskState> states);
+
+    List<TaskRecord> findByAssignedWorkerIdAndStateIn(String workerId, Collection<TaskState> states);
 }

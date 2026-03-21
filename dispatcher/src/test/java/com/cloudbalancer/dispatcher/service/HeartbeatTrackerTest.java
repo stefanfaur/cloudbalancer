@@ -24,6 +24,9 @@ class HeartbeatTrackerTest {
     @Mock
     private WorkerRepository workerRepository;
 
+    @Mock
+    private WorkerFailureHandler workerFailureHandler;
+
     private HeartbeatTracker tracker;
 
     private static final long SUSPECT_THRESHOLD = 30;
@@ -31,7 +34,7 @@ class HeartbeatTrackerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new HeartbeatTracker(workerRepository, SUSPECT_THRESHOLD, DEAD_THRESHOLD);
+        tracker = new HeartbeatTracker(workerRepository, workerFailureHandler, SUSPECT_THRESHOLD, DEAD_THRESHOLD);
     }
 
     @Test
@@ -81,6 +84,7 @@ class HeartbeatTrackerTest {
         ArgumentCaptor<WorkerRecord> captor = ArgumentCaptor.forClass(WorkerRecord.class);
         verify(workerRepository).save(captor.capture());
         assertThat(captor.getValue().getHealthState()).isEqualTo(WorkerHealthState.DEAD);
+        verify(workerFailureHandler).onWorkerDead(workerId);
     }
 
     @Test

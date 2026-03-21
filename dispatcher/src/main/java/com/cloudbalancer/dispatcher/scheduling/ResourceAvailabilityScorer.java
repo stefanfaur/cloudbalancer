@@ -1,8 +1,12 @@
 package com.cloudbalancer.dispatcher.scheduling;
 
 import com.cloudbalancer.common.model.ResourceProfile;
+import com.cloudbalancer.common.model.WorkerHealthState;
 import com.cloudbalancer.dispatcher.persistence.TaskRecord;
 import com.cloudbalancer.dispatcher.persistence.WorkerRecord;
+
+import java.time.Duration;
+import java.time.Instant;
 
 public class ResourceAvailabilityScorer implements WorkerScorer {
 
@@ -25,7 +29,23 @@ public class ResourceAvailabilityScorer implements WorkerScorer {
 
         // Average of free resource percentages, scaled to 0-100
         double avgFree = (cpuFree + memFree + diskFree) / 3.0;
-        return (int) Math.round(Math.max(0, Math.min(100, avgFree * 100)));
+        int baseScore = (int) Math.round(Math.max(0, Math.min(100, avgFree * 100)));
+
+        // Apply recovery penalty if RECOVERING
+        if (worker.getHealthState() == WorkerHealthState.RECOVERING && worker.getRecoveryStartedAt() != null) {
+            long recoverySeconds = Duration.between(worker.getRecoveryStartedAt(), Instant.now()).getSeconds();
+            float penalty;
+            if (recoverySeconds >= 40) {
+                penalty = 0.75f;  // Near-normal at 40-60s
+            } else if (recoverySeconds >= 20) {
+                penalty = 0.5f;   // Moderate at 20-40s
+            } else {
+                penalty = 0.25f;  // Severe penalty first 20s
+            }
+            return (int) (baseScore * penalty);
+        }
+
+        return baseScore;
     }
 
     @Override

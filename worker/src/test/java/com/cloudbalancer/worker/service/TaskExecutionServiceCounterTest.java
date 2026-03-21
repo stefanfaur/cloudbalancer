@@ -1,6 +1,7 @@
 package com.cloudbalancer.worker.service;
 
 import com.cloudbalancer.common.model.*;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,18 +17,29 @@ import java.util.UUID;
 import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 class TaskExecutionServiceCounterTest {
 
     @Mock
     private KafkaTemplate<String, String> kafkaTemplate;
+    @Mock
+    private CircuitBreaker circuitBreaker;
+    @Mock
+    private WorkerChaosService workerChaosService;
 
     private TaskExecutionService service;
 
     @BeforeEach
     void setUp() {
-        service = new TaskExecutionService(kafkaTemplate, "test-worker");
+        // Make circuit breaker execute the runnable passed to it
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(circuitBreaker).executeRunnable(any(Runnable.class));
+        service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService);
     }
 
     private TaskAssignment createAssignment(int durationMs, double failProbability) {
@@ -40,7 +52,7 @@ class TaskExecutionServiceCounterTest {
             ExecutionPolicy.defaults(),
             TaskIO.none()
         );
-        return new TaskAssignment(UUID.randomUUID(), descriptor, "test-worker", Instant.now());
+        return new TaskAssignment(UUID.randomUUID(), descriptor, "test-worker", Instant.now(), UUID.randomUUID());
     }
 
     private TaskAssignment createAssignmentWithTimeout(int durationMs, double failProbability, int timeoutSeconds) {
@@ -53,7 +65,7 @@ class TaskExecutionServiceCounterTest {
             new ExecutionPolicy(3, timeoutSeconds, BackoffStrategy.FIXED, FailureAction.RETRY),
             TaskIO.none()
         );
-        return new TaskAssignment(UUID.randomUUID(), descriptor, "test-worker", Instant.now());
+        return new TaskAssignment(UUID.randomUUID(), descriptor, "test-worker", Instant.now(), UUID.randomUUID());
     }
 
     @Test

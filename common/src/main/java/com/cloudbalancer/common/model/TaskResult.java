@@ -11,7 +11,8 @@ public record TaskResult(
     String stderr,
     long executionDurationMs,
     boolean timedOut,
-    Instant completedAt
+    Instant completedAt,
+    UUID executionId
 ) {
     public boolean succeeded() { return exitCode == 0 && !timedOut; }
 }

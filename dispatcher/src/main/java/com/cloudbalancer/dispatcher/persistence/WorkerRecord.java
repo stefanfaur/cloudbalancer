@@ -37,6 +37,9 @@ public class WorkerRecord {
     @Column(name = "active_task_count", nullable = false)
     private int activeTaskCount = 0;
 
+    @Column(name = "recovery_started_at")
+    private Instant recoveryStartedAt;
+
     protected WorkerRecord() {}
 
     public WorkerRecord(String id, WorkerHealthState healthState,
@@ -79,4 +82,6 @@ public class WorkerRecord {
     public int getAllocatedMemoryMb() { return allocatedMemoryMb; }
     public int getAllocatedDiskMb() { return allocatedDiskMb; }
     public int getActiveTaskCount() { return activeTaskCount; }
+    public Instant getRecoveryStartedAt() { return recoveryStartedAt; }
+    public void setRecoveryStartedAt(Instant recoveryStartedAt) { this.recoveryStartedAt = recoveryStartedAt; }
 }

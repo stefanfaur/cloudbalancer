@@ -7,5 +7,6 @@ public record TaskAssignment(
     UUID taskId,
     TaskDescriptor descriptor,
     String assignedWorkerId,
-    Instant assignedAt
+    Instant assignedAt,
+    UUID executionId
 ) {}

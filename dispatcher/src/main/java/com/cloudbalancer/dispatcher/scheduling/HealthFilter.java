@@ -11,7 +11,8 @@ public class HealthFilter implements WorkerFilter {
     @Override
     public List<WorkerRecord> filter(TaskRecord task, List<WorkerRecord> candidates) {
         return candidates.stream()
-            .filter(w -> w.getHealthState() == WorkerHealthState.HEALTHY)
+            .filter(w -> w.getHealthState() == WorkerHealthState.HEALTHY
+                      || w.getHealthState() == WorkerHealthState.RECOVERING)
             .toList();
     }
 }

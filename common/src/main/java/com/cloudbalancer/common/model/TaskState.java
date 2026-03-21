@@ -5,7 +5,7 @@ import java.util.Set;
 
 public enum TaskState {
     SUBMITTED, VALIDATED, QUEUED, ASSIGNED, PROVISIONING,
-    RUNNING, POST_PROCESSING, COMPLETED, FAILED, TIMED_OUT, CANCELLED;
+    RUNNING, POST_PROCESSING, COMPLETED, FAILED, TIMED_OUT, CANCELLED, DEAD_LETTERED;
 
     private static final Map<TaskState, Set<TaskState>> VALID_TRANSITIONS = Map.ofEntries(
         Map.entry(SUBMITTED,        Set.of(VALIDATED, FAILED, CANCELLED)),
@@ -16,9 +16,10 @@ public enum TaskState {
         Map.entry(RUNNING,          Set.of(POST_PROCESSING, FAILED, TIMED_OUT, CANCELLED)),
         Map.entry(POST_PROCESSING,  Set.of(COMPLETED, FAILED)),
         Map.entry(COMPLETED,        Set.of()),
-        Map.entry(FAILED,           Set.of(QUEUED)),  // FAILED -> QUEUED for retries
-        Map.entry(TIMED_OUT,        Set.of(QUEUED)),  // TIMED_OUT -> QUEUED for retries
-        Map.entry(CANCELLED,        Set.of())
+        Map.entry(FAILED,           Set.of(QUEUED, DEAD_LETTERED)),  // FAILED -> QUEUED for retries, DEAD_LETTERED when exhausted
+        Map.entry(TIMED_OUT,        Set.of(QUEUED, DEAD_LETTERED)),  // TIMED_OUT -> QUEUED for retries, DEAD_LETTERED when exhausted
+        Map.entry(CANCELLED,        Set.of()),
+        Map.entry(DEAD_LETTERED,    Set.of())
     );
 
     public boolean canTransitionTo(TaskState target) {
@@ -26,6 +27,6 @@ public enum TaskState {
     }
 
     public boolean isTerminal() {
-        return this == COMPLETED || this == CANCELLED || this == TIMED_OUT || this == FAILED;
+        return this == COMPLETED || this == CANCELLED || this == TIMED_OUT || this == FAILED || this == DEAD_LETTERED;
     }
 }

@@ -60,7 +60,10 @@ class TaskDescriptorTest {
             Instant.parse("2026-03-19T10:00:00Z"),
             Instant.parse("2026-03-19T10:01:00Z"),
             0,
-            new ResourceProfile(2, 3500, 800, false, 60, false)
+            new ResourceProfile(2, 3500, 800, false, 60, false),
+            null,
+            false,
+            null
         );
 
         String json = mapper.writeValueAsString(attempt);

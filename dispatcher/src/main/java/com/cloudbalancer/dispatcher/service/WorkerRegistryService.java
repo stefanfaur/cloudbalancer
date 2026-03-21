@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -34,11 +35,19 @@ public class WorkerRegistryService {
         var existing = workerRepository.findById(workerId);
         if (existing.isPresent()) {
             var record = existing.get();
-            record.setHealthState(healthState);
+            if (record.getHealthState() == WorkerHealthState.DEAD) {
+                // Previously dead worker returning — soft-start
+                record.setHealthState(WorkerHealthState.RECOVERING);
+                record.setRecoveryStartedAt(Instant.now());
+                log.info("Worker {} recovered from DEAD -> RECOVERING", workerId);
+            } else {
+                record.setHealthState(healthState);
+            }
             record.setCapabilities(capabilities);
             record.setRegisteredAt(Instant.now());
             workerRepository.save(record);
         } else {
+            // New worker — no soft-start needed
             var record = new WorkerRecord(workerId, healthState, capabilities, Instant.now());
             workerRepository.save(record);
         }
@@ -50,7 +59,11 @@ public class WorkerRegistryService {
     }
 
     public List<WorkerRecord> getAvailableWorkers() {
-        return workerRepository.findByHealthState(WorkerHealthState.HEALTHY);
+        var healthy = workerRepository.findByHealthState(WorkerHealthState.HEALTHY);
+        var recovering = workerRepository.findByHealthState(WorkerHealthState.RECOVERING);
+        var combined = new ArrayList<>(healthy);
+        combined.addAll(recovering);
+        return combined;
     }
 
     public List<WorkerRecord> getAllWorkers() {

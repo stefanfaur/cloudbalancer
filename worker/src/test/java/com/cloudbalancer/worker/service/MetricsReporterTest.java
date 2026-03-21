@@ -6,6 +6,7 @@ import com.cloudbalancer.common.model.WorkerHealthState;
 import com.cloudbalancer.common.model.WorkerMetrics;
 import com.cloudbalancer.common.util.JsonUtil;
 import com.cloudbalancer.worker.config.WorkerProperties;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +30,9 @@ class MetricsReporterTest {
 
     @Mock
     private TaskExecutionService taskExecutionService;
+
+    @Mock
+    private CircuitBreaker circuitBreaker;
 
     @Captor
     private ArgumentCaptor<String> topicCaptor;
@@ -43,11 +48,17 @@ class MetricsReporterTest {
 
     @BeforeEach
     void setUp() {
+        // Make circuit breaker execute the runnable passed to it (lenient for tests that don't publish)
+        lenient().doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(circuitBreaker).executeRunnable(any(Runnable.class));
+
         properties = new WorkerProperties();
         properties.setId(WORKER_ID);
         properties.setMetricsIntervalMs(5000);
         properties.setHeartbeatIntervalMs(10000);
-        reporter = new MetricsReporter(kafkaTemplate, properties, taskExecutionService);
+        reporter = new MetricsReporter(kafkaTemplate, properties, taskExecutionService, circuitBreaker);
     }
 
     @Test

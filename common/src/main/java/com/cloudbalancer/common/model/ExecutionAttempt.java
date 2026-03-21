@@ -1,6 +1,7 @@
 package com.cloudbalancer.common.model;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public record ExecutionAttempt(
     int attemptNumber,
@@ -8,5 +9,8 @@ public record ExecutionAttempt(
     Instant startedAt,
     Instant completedAt,
     int exitCode,
-    ResourceProfile actualResources
+    ResourceProfile actualResources,
+    String failureReason,
+    boolean workerCausedFailure,
+    UUID executionId
 ) {}

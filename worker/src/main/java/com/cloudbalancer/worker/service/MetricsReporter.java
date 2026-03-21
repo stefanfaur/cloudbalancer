@@ -7,8 +7,11 @@ import com.cloudbalancer.common.model.WorkerMetrics;
 import com.cloudbalancer.common.util.JsonUtil;
 import com.cloudbalancer.worker.config.WorkerProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,13 +28,16 @@ public class MetricsReporter {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final WorkerProperties properties;
     private final TaskExecutionService taskExecutionService;
+    private final CircuitBreaker circuitBreaker;
 
     public MetricsReporter(KafkaTemplate<String, String> kafkaTemplate,
                            WorkerProperties properties,
-                           TaskExecutionService taskExecutionService) {
+                           TaskExecutionService taskExecutionService,
+                           @Qualifier("workerResultProducerCircuitBreaker") CircuitBreaker circuitBreaker) {
         this.kafkaTemplate = kafkaTemplate;
         this.properties = properties;
         this.taskExecutionService = taskExecutionService;
+        this.circuitBreaker = circuitBreaker;
     }
 
     @Scheduled(fixedDelayString = "${cloudbalancer.worker.metrics-interval-ms:5000}")
@@ -75,7 +81,9 @@ public class MetricsReporter {
     private void publish(String topic, String key, Object event) {
         try {
             String json = JsonUtil.mapper().writeValueAsString(event);
-            kafkaTemplate.send(topic, key, json);
+            circuitBreaker.executeRunnable(() -> kafkaTemplate.send(topic, key, json));
+        } catch (CallNotPermittedException e) {
+            log.warn("Circuit breaker is open — skipping publish to topic {}: {}", topic, e.getMessage());
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event for topic {}", topic, e);
         }

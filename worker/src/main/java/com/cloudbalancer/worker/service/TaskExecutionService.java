@@ -4,8 +4,11 @@ import com.cloudbalancer.common.executor.*;
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,8 @@ public class TaskExecutionService {
     private final String workerId;
     private final Map<ExecutorType, TaskExecutor> executors;
     private final ExecutorService threadPool = Executors.newCachedThreadPool();
+    private final CircuitBreaker circuitBreaker;
+    private final WorkerChaosService workerChaosService;
 
     private final AtomicInteger activeTaskCount = new AtomicInteger(0);
     private final AtomicLong completedTaskCount = new AtomicLong(0);
@@ -33,19 +38,32 @@ public class TaskExecutionService {
     private final AtomicLong executionCount = new AtomicLong(0);
 
     public TaskExecutionService(KafkaTemplate<String, String> kafkaTemplate,
-                                 @Value("${cloudbalancer.worker.id:worker-1}") String workerId) {
+                                 @Value("${cloudbalancer.worker.id:worker-1}") String workerId,
+                                 @Qualifier("workerResultProducerCircuitBreaker") CircuitBreaker circuitBreaker,
+                                 WorkerChaosService workerChaosService) {
         this.kafkaTemplate = kafkaTemplate;
         this.workerId = workerId;
+        this.circuitBreaker = circuitBreaker;
+        this.workerChaosService = workerChaosService;
         this.executors = Map.of(ExecutorType.SIMULATED, new SimulatedExecutor());
     }
 
     public void executeTask(TaskAssignment assignment) {
+        try {
+            workerChaosService.checkAndApplyLatency("execution");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Task execution interrupted by chaos latency injection");
+            return;
+        }
+
         TaskDescriptor descriptor = assignment.descriptor();
         TaskExecutor executor = executors.get(descriptor.executorType());
         if (executor == null) {
             publishResult(assignment.taskId(), new TaskResult(
                 assignment.taskId(), workerId, 1, "",
-                "No executor for type: " + descriptor.executorType(), 0, false, Instant.now()
+                "No executor for type: " + descriptor.executorType(), 0, false, Instant.now(),
+                assignment.executionId()
             ));
             return;
         }
@@ -70,7 +88,7 @@ public class TaskExecutionService {
             publishResult(assignment.taskId(), new TaskResult(
                 assignment.taskId(), workerId, result.exitCode(),
                 result.stdout(), result.stderr(), result.durationMs(),
-                result.timedOut(), Instant.now()
+                result.timedOut(), Instant.now(), assignment.executionId()
             ));
             if (result.succeeded()) {
                 completedTaskCount.incrementAndGet();
@@ -85,13 +103,14 @@ public class TaskExecutionService {
             publishResult(assignment.taskId(), new TaskResult(
                 assignment.taskId(), workerId, 1, "",
                 "Execution timed out after " + timeoutSeconds + "s",
-                timeoutSeconds * 1000L, true, Instant.now()
+                timeoutSeconds * 1000L, true, Instant.now(), assignment.executionId()
             ));
         } catch (Exception e) {
             failedTaskCount.incrementAndGet();
             publishResult(assignment.taskId(), new TaskResult(
                 assignment.taskId(), workerId, 1, "",
-                "Execution error: " + e.getMessage(), 0, false, Instant.now()
+                "Execution error: " + e.getMessage(), 0, false, Instant.now(),
+                assignment.executionId()
             ));
         } finally {
             activeTaskCount.decrementAndGet();
@@ -112,8 +131,10 @@ public class TaskExecutionService {
     private void publishResult(UUID taskId, TaskResult result) {
         try {
             String json = JsonUtil.mapper().writeValueAsString(result);
-            kafkaTemplate.send("tasks.results", taskId.toString(), json);
+            circuitBreaker.executeRunnable(() -> kafkaTemplate.send("tasks.results", taskId.toString(), json));
             log.info("Published result for task {}: exitCode={}, timedOut={}", taskId, result.exitCode(), result.timedOut());
+        } catch (CallNotPermittedException e) {
+            log.error("Circuit breaker is open — cannot publish result for task {}: {}", taskId, e.getMessage());
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize task result", e);
         }

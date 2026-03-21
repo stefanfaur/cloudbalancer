@@ -26,7 +26,7 @@ class KafkaDtoSerializationTest {
             TaskIO.none()
         );
         var assignment = new TaskAssignment(
-            UUID.randomUUID(), descriptor, "worker-1", Instant.now()
+            UUID.randomUUID(), descriptor, "worker-1", Instant.now(), UUID.randomUUID()
         );
 
         String json = mapper.writeValueAsString(assignment);
@@ -40,7 +40,7 @@ class KafkaDtoSerializationTest {
     @Test
     void taskResultRoundTrip() throws Exception {
         var result = new TaskResult(
-            UUID.randomUUID(), "worker-1", 0, "hello", "", 1500, false, Instant.now()
+            UUID.randomUUID(), "worker-1", 0, "hello", "", 1500, false, Instant.now(), UUID.randomUUID()
         );
 
         String json = mapper.writeValueAsString(result);

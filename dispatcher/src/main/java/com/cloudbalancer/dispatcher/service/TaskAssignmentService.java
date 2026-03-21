@@ -20,17 +20,28 @@ public class TaskAssignmentService {
     private final WorkerRegistryService workerRegistry;
     private final SchedulingPipeline schedulingPipeline;
     private final EventPublisher eventPublisher;
+    private final ChaosMonkeyService chaosMonkeyService;
 
     public TaskAssignmentService(TaskService taskService, WorkerRegistryService workerRegistry,
-                                  SchedulingPipeline schedulingPipeline, EventPublisher eventPublisher) {
+                                  SchedulingPipeline schedulingPipeline, EventPublisher eventPublisher,
+                                  ChaosMonkeyService chaosMonkeyService) {
         this.taskService = taskService;
         this.workerRegistry = workerRegistry;
         this.schedulingPipeline = schedulingPipeline;
         this.eventPublisher = eventPublisher;
+        this.chaosMonkeyService = chaosMonkeyService;
     }
 
     @Scheduled(fixedDelayString = "${cloudbalancer.dispatcher.assignment-interval-ms:1000}")
     public void assignPendingTasks() {
+        try {
+            chaosMonkeyService.checkAndApplyLatency("assignment");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Assignment interrupted by chaos latency injection");
+            return;
+        }
+
         var allWorkers = workerRegistry.getAllWorkers();
         if (allWorkers.isEmpty()) {
             return;
@@ -44,16 +55,18 @@ public class TaskAssignmentService {
             }
 
             var worker = selected.get();
+            UUID executionId = UUID.randomUUID();
             task.transitionTo(TaskState.ASSIGNED);
             task.setAssignedWorkerId(worker.getId());
             task.setAssignedAt(Instant.now());
+            task.setCurrentExecutionId(executionId);
             taskService.updateTask(task);
 
             workerRegistry.allocateResources(worker.getId(),
                 task.getDescriptor().resourceProfile());
 
             var assignment = new TaskAssignment(
-                task.getId(), task.getDescriptor(), worker.getId(), Instant.now()
+                task.getId(), task.getDescriptor(), worker.getId(), Instant.now(), executionId
             );
             eventPublisher.publishMessage("tasks.assigned", worker.getId(), assignment);
 

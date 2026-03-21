@@ -7,8 +7,10 @@ import com.cloudbalancer.common.util.JsonUtil;
 import com.cloudbalancer.dispatcher.persistence.TaskRecord;
 import com.cloudbalancer.dispatcher.service.TaskService;
 import com.cloudbalancer.dispatcher.service.WorkerRegistryService;
+import com.cloudbalancer.dispatcher.util.BackoffCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
@@ -21,12 +23,15 @@ public class TaskResultListener {
     private final TaskService taskService;
     private final WorkerRegistryService workerRegistryService;
     private final EventPublisher eventPublisher;
+    private final long baseDelaySeconds;
 
     public TaskResultListener(TaskService taskService, WorkerRegistryService workerRegistryService,
-                              EventPublisher eventPublisher) {
+                              EventPublisher eventPublisher,
+                              @Value("${cloudbalancer.retry.base-delay-seconds:5}") long baseDelaySeconds) {
         this.taskService = taskService;
         this.workerRegistryService = workerRegistryService;
         this.eventPublisher = eventPublisher;
+        this.baseDelaySeconds = baseDelaySeconds;
     }
 
     @KafkaListener(topics = "tasks.results", groupId = "dispatcher")
@@ -36,6 +41,14 @@ public class TaskResultListener {
             TaskRecord record = taskService.getTaskRecord(result.taskId());
             if (record == null) {
                 log.warn("Received result for unknown task: {}", result.taskId());
+                return;
+            }
+
+            // Check idempotency — discard stale results from previous assignments
+            if (result.executionId() != null && record.getCurrentExecutionId() != null
+                    && !result.executionId().equals(record.getCurrentExecutionId())) {
+                log.warn("Stale result for task {}: executionId mismatch (result={}, current={}), discarding",
+                    result.taskId(), result.executionId(), record.getCurrentExecutionId());
                 return;
             }
 
@@ -64,6 +77,18 @@ public class TaskResultListener {
                 record.transitionTo(TaskState.FAILED);
             }
 
+            // Calculate backoff for retriable failures
+            if (record.getState() == TaskState.FAILED || record.getState() == TaskState.TIMED_OUT) {
+                int attemptCount = record.getExecutionHistory().size() + 1;
+                Instant nextRetryTime = BackoffCalculator.calculateNextRetryTime(
+                    record.getDescriptor().executionPolicy().retryBackoffStrategy(),
+                    attemptCount,
+                    baseDelaySeconds,
+                    Instant.now()
+                );
+                record.setRetryEligibleAt(nextRetryTime);
+            }
+
             // Record execution attempt
             record.addAttempt(new ExecutionAttempt(
                 record.getExecutionHistory().size() + 1,
@@ -71,7 +96,10 @@ public class TaskResultListener {
                 record.getSubmittedAt(),
                 Instant.now(),
                 result.exitCode(),
-                null
+                null,
+                result.succeeded() ? null : result.stderr(),
+                false,
+                result.executionId()
             ));
 
             taskService.updateTask(record);
