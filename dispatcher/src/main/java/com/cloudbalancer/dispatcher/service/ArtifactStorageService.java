@@ -35,7 +35,7 @@ public class ArtifactStorageService {
         }
         Path dir = Path.of(basePath, taskId.toString());
         Files.createDirectories(dir);
-        Path target = dir.resolve(name);
+        Path target = safeResolve(dir, name);
         log.info("Storing artifact '{}' for task {} ({} bytes)", name, taskId, contentLength);
         try (data) {
             Files.copy(data, target, StandardCopyOption.REPLACE_EXISTING);
@@ -43,7 +43,16 @@ public class ArtifactStorageService {
     }
 
     public Optional<Path> retrieve(UUID taskId, String name) {
-        Path file = Path.of(basePath, taskId.toString(), name);
+        Path dir = Path.of(basePath, taskId.toString());
+        Path file = safeResolve(dir, name);
         return Files.exists(file) ? Optional.of(file) : Optional.empty();
+    }
+
+    private Path safeResolve(Path dir, String name) {
+        Path resolved = dir.resolve(name).normalize();
+        if (!resolved.startsWith(dir)) {
+            throw new IllegalArgumentException("Invalid artifact name: " + name);
+        }
+        return resolved;
     }
 }

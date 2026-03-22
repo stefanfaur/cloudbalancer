@@ -30,6 +30,23 @@ class ArtifactStorageServiceTest {
     }
 
     @Test
+    void storeRejectsPathTraversal(@TempDir Path baseDir) {
+        var service = new ArtifactStorageService(baseDir.toString(), 104_857_600);
+        byte[] content = "malicious".getBytes();
+        assertThatThrownBy(() ->
+            service.store(UUID.randomUUID(), "../escape.txt",
+                new ByteArrayInputStream(content), content.length))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void retrieveRejectsPathTraversal(@TempDir Path baseDir) {
+        var service = new ArtifactStorageService(baseDir.toString(), 104_857_600);
+        assertThatThrownBy(() -> service.retrieve(UUID.randomUUID(), "../escape.txt"))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void storeRejectsOversizedArtifact(@TempDir Path baseDir) {
         var service = new ArtifactStorageService(baseDir.toString(), 10);
         byte[] content = "this exceeds 10 bytes easily".getBytes();
