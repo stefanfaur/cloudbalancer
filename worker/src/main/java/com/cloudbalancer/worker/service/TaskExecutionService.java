@@ -120,7 +120,7 @@ public class TaskExecutionService {
             }
 
             // Create log callback and task context
-            LogCallback logCallback = createLogCallback(assignment.taskId());
+            RateLimitedLogCallback logCallback = createLogCallback(assignment.taskId());
             var context = new TaskContext(assignment.taskId(), workDir, logCallback);
 
             Future<ExecutionResult> future = threadPool.submit(() ->
@@ -130,6 +130,9 @@ public class TaskExecutionService {
             activeTaskCount.incrementAndGet();
             try {
                 ExecutionResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
+
+                // Flush any remaining buffered log lines
+                logCallback.flush();
 
                 // Collect and upload output artifacts
                 collectAndUploadArtifacts(assignment.taskId(), outputs, workDir);
@@ -151,6 +154,9 @@ public class TaskExecutionService {
                 executor.cancel(new ExecutionHandle(assignment.taskId().toString()));
                 failedTaskCount.incrementAndGet();
 
+                // Flush any remaining buffered log lines
+                logCallback.flush();
+
                 // Collect outputs even on failure
                 collectAndUploadArtifacts(assignment.taskId(), outputs, workDir);
 
@@ -161,6 +167,9 @@ public class TaskExecutionService {
                 ));
             } catch (Exception e) {
                 failedTaskCount.incrementAndGet();
+
+                // Flush any remaining buffered log lines
+                logCallback.flush();
 
                 // Collect outputs even on failure
                 collectAndUploadArtifacts(assignment.taskId(), outputs, workDir);
@@ -190,16 +199,8 @@ public class TaskExecutionService {
         return count == 0 ? 0.0 : (double) totalExecutionDurationMs.get() / count;
     }
 
-    private LogCallback createLogCallback(UUID taskId) {
-        return (line, isStderr, timestamp) -> {
-            try {
-                LogMessage msg = new LogMessage(taskId, line, isStderr, timestamp);
-                String json = JsonUtil.mapper().writeValueAsString(msg);
-                kafkaTemplate.send("tasks.logs", taskId.toString(), json);
-            } catch (Exception e) {
-                log.debug("Failed to publish log line for task {}: {}", taskId, e.getMessage());
-            }
-        };
+    private RateLimitedLogCallback createLogCallback(UUID taskId) {
+        return new RateLimitedLogCallback(taskId, kafkaTemplate, 50);
     }
 
     private void collectAndUploadArtifacts(UUID taskId, List<TaskIO.OutputArtifact> outputs, Path workDir) {
