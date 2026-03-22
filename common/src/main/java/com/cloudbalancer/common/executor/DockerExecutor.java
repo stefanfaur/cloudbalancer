@@ -8,7 +8,6 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
-import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.api.model.Capability;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
@@ -113,8 +112,8 @@ public class DockerExecutor implements TaskExecutor {
             dockerClient.startContainerCmd(containerId).exec();
 
             // Stream logs DURING execution so the callback receives lines in real-time
-            StringBuilder stdout = new StringBuilder();
-            StringBuilder stderr = new StringBuilder();
+            StringBuffer stdout = new StringBuffer();
+            StringBuffer stderr = new StringBuffer();
             LogCallback logCb = context.logCallback();
 
             var logCbAdapter = new ResultCallback.Adapter<Frame>() {
