@@ -26,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 
 public class PythonExecutor implements TaskExecutor {
 
+    private static final int MAX_OUTPUT_BYTES = 1_048_576; // 1 MB
+
     private final String pythonBinary;
     private final ConcurrentHashMap<UUID, Process> runningProcesses = new ConcurrentHashMap<>();
 
@@ -224,12 +226,17 @@ public class PythonExecutor implements TaskExecutor {
                 new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             StringBuilder sb = new StringBuilder();
             String line;
+            int totalBytes = 0;
             while ((line = reader.readLine()) != null) {
                 if (callback != null) {
                     callback.onLogLine(line, isStderr, Instant.now());
                 }
-                if (!sb.isEmpty()) sb.append('\n');
-                sb.append(line);
+                int lineBytes = line.length() + 1; // +1 for the newline
+                if (totalBytes + lineBytes <= MAX_OUTPUT_BYTES) {
+                    if (sb.length() > 0) sb.append('\n');
+                    sb.append(line);
+                    totalBytes += lineBytes;
+                }
             }
             return sb.toString();
         } catch (IOException e) {

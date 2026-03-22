@@ -106,6 +106,17 @@ class PythonExecutorTest {
     }
 
     @Test
+    void executeTruncatesLargeOutput(@TempDir Path workDir) {
+        // Generate output larger than 1MB (~10MB total)
+        String script = "for i in range(100000): print('x' * 100)";
+        Map<String, Object> spec = Map.of("script", script);
+        var ctx = new TaskContext(UUID.randomUUID(), workDir);
+        ExecutionResult result = executor.execute(spec, new ResourceAllocation(1, 256, 100), ctx);
+        assertThat(result.exitCode()).isEqualTo(0);
+        assertThat(result.stdout().length()).isLessThanOrEqualTo(1_048_576);
+    }
+
+    @Test
     void cancelKillsPythonProcess(@TempDir Path workDir) throws Exception {
         Map<String, Object> spec = Map.of("script", "import time; time.sleep(300)");
         UUID taskId = UUID.randomUUID();
