@@ -59,7 +59,7 @@ public class ArtifactService {
     public List<CollectedArtifact> collectOutputs(List<OutputArtifact> outputs, Path workDir) {
         List<CollectedArtifact> collected = new ArrayList<>();
         for (OutputArtifact output : outputs) {
-            Path filePath = workDir.resolve(output.path());
+            Path filePath = safeResolve(workDir, output.path());
             if (Files.exists(filePath)) {
                 collected.add(new CollectedArtifact(output.name(), filePath));
                 log.debug("Collected output artifact: {}", output.name());
@@ -105,7 +105,7 @@ public class ArtifactService {
         if (decoded.length > maxSizeBytes) {
             throw new IOException("Inline artifact " + input.name() + " exceeds max size: " + decoded.length);
         }
-        Path target = workDir.resolve(input.name());
+        Path target = safeResolve(workDir, input.name());
         Files.write(target, decoded);
         log.debug("Staged inline artifact: {} ({} bytes)", input.name(), decoded.length);
     }
@@ -127,8 +127,16 @@ public class ArtifactService {
             throw new IOException("HTTP artifact " + input.name() + " exceeds max size: " + body.length);
         }
 
-        Path target = workDir.resolve(input.name());
+        Path target = safeResolve(workDir, input.name());
         Files.write(target, body);
         log.debug("Staged HTTP artifact: {} ({} bytes)", input.name(), body.length);
+    }
+
+    private Path safeResolve(Path dir, String name) {
+        Path resolved = dir.resolve(name).normalize();
+        if (!resolved.startsWith(dir.normalize())) {
+            throw new IllegalArgumentException("Invalid artifact name: " + name);
+        }
+        return resolved;
     }
 }
