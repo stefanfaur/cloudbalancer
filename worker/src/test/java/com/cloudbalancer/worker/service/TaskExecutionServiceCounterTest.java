@@ -30,6 +30,8 @@ class TaskExecutionServiceCounterTest {
     private CircuitBreaker circuitBreaker;
     @Mock
     private WorkerChaosService workerChaosService;
+    @Mock
+    private ArtifactService artifactService;
 
     private TaskExecutionService service;
 
@@ -40,7 +42,7 @@ class TaskExecutionServiceCounterTest {
             ((Runnable) invocation.getArgument(0)).run();
             return null;
         }).when(circuitBreaker).executeRunnable(any(Runnable.class));
-        service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
+        service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()), artifactService);
     }
 
     private TaskAssignment createAssignment(int durationMs, double failProbability) {

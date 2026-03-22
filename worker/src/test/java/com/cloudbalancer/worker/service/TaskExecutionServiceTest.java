@@ -26,6 +26,7 @@ class TaskExecutionServiceTest {
     @Mock private KafkaTemplate<String, String> kafkaTemplate;
     @Mock private CircuitBreaker circuitBreaker;
     @Mock private WorkerChaosService workerChaosService;
+    @Mock private ArtifactService artifactService;
 
     @BeforeEach
     void setUp() {
@@ -38,7 +39,7 @@ class TaskExecutionServiceTest {
 
     @Test
     void executesTaskAndPublishesSuccessResult() throws Exception {
-        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
+        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()), artifactService);
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 100, "failProbability", 0.0),
             new ResourceProfile(1, 512, 256, false, 10, false),
@@ -61,7 +62,7 @@ class TaskExecutionServiceTest {
 
     @Test
     void executesTaskAndPublishesFailureResult() throws Exception {
-        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
+        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()), artifactService);
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 100, "failProbability", 1.0),
             new ResourceProfile(1, 512, 256, false, 10, false),
@@ -82,7 +83,7 @@ class TaskExecutionServiceTest {
 
     @Test
     void respectsExecutionTimeout() throws Exception {
-        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()));
+        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()), artifactService);
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 30000, "failProbability", 0.0),
             new ResourceProfile(1, 512, 256, false, 10, false),
