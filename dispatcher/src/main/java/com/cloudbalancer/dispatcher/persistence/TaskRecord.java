@@ -56,6 +56,12 @@ public class TaskRecord {
     @Column(name = "current_execution_id", columnDefinition = "uuid")
     private UUID currentExecutionId;
 
+    @Column(name = "last_stdout", columnDefinition = "TEXT")
+    private String lastStdout;
+
+    @Column(name = "last_stderr", columnDefinition = "TEXT")
+    private String lastStderr;
+
     protected TaskRecord() {}
 
     public static TaskRecord create(TaskDescriptor descriptor) {
@@ -97,6 +103,10 @@ public class TaskRecord {
     public void setRetryEligibleAt(Instant retryEligibleAt) { this.retryEligibleAt = retryEligibleAt; }
     public UUID getCurrentExecutionId() { return currentExecutionId; }
     public void setCurrentExecutionId(UUID currentExecutionId) { this.currentExecutionId = currentExecutionId; }
+    public String getLastStdout() { return lastStdout; }
+    public void setLastStdout(String lastStdout) { this.lastStdout = lastStdout; }
+    public String getLastStderr() { return lastStderr; }
+    public void setLastStderr(String lastStderr) { this.lastStderr = lastStderr; }
 
     public void addAttempt(ExecutionAttempt attempt) {
         this.executionHistory.add(attempt);

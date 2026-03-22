@@ -102,6 +102,10 @@ public class TaskResultListener {
                 result.executionId()
             ));
 
+            // Persist stdout/stderr from execution result
+            record.setLastStdout(result.stdout());
+            record.setLastStderr(result.stderr());
+
             taskService.updateTask(record);
 
             // Release resource ledger on terminal state
