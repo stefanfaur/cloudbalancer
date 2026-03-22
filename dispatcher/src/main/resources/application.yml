@@ -39,6 +39,8 @@ cloudbalancer:
     heartbeat-suspect-threshold-seconds: 30
     heartbeat-dead-threshold-seconds: 60
     liveness-check-interval-ms: 10000
+    artifact-base-path: ${ARTIFACT_BASE_PATH:artifacts}
+    artifact-max-size-bytes: ${ARTIFACT_MAX_SIZE_BYTES:104857600}
   retry:
     scan-interval-ms: 5000
     base-delay-seconds: 5
