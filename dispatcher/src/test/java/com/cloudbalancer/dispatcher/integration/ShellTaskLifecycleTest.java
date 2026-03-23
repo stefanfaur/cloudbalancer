@@ -5,6 +5,8 @@ import com.cloudbalancer.common.executor.SimulatedExecutor;
 import com.cloudbalancer.common.executor.TaskExecutor;
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
+import com.cloudbalancer.dispatcher.persistence.TaskRepository;
+import com.cloudbalancer.dispatcher.persistence.WorkerRepository;
 import com.cloudbalancer.dispatcher.test.TestContainersConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +34,12 @@ class ShellTaskLifecycleTest {
     @Autowired
     private KafkaContainer kafka;
 
+    @Autowired
+    private WorkerRepository workerRepository;
+
+    @Autowired
+    private TaskRepository taskRepository;
+
     @LocalServerPort
     private int port;
 
@@ -40,6 +48,10 @@ class ShellTaskLifecycleTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Clean stale state from other integration tests sharing this Spring context
+        taskRepository.deleteAll();
+        workerRepository.deleteAll();
+
         var baseClient = RestClient.create("http://localhost:" + port);
 
         // Login as seed admin to get access token
