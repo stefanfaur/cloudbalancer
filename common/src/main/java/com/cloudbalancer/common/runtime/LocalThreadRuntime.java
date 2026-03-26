@@ -11,7 +11,7 @@ public class LocalThreadRuntime implements NodeRuntime {
     private final Map<String, WorkerInfo> workers = new ConcurrentHashMap<>();
 
     @Override
-    public void startWorker(WorkerConfig config) {
+    public boolean startWorker(WorkerConfig config) {
         var capabilities = new WorkerCapabilities(
             config.supportedExecutors(),
             new ResourceProfile(config.cpuCores(), config.memoryMB(), config.diskMB(), false, 0, true),
@@ -20,6 +20,7 @@ public class LocalThreadRuntime implements NodeRuntime {
         var metrics = new WorkerMetrics(0, 0, 0, 0, 0, 0L, 0L, 0.0, Instant.now());
         var info = new WorkerInfo(config.workerId(), WorkerHealthState.HEALTHY, capabilities, metrics, Instant.now());
         workers.put(config.workerId(), info);
+        return true;
     }
 
     @Override

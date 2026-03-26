@@ -5,6 +5,7 @@ import com.cloudbalancer.common.util.JsonUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -99,6 +100,35 @@ class EventSerializationTest {
         WorkerHeartbeatEvent typed = (WorkerHeartbeatEvent) deserialized;
         assertThat(typed.workerId()).isEqualTo("worker-1");
         assertThat(typed.healthState()).isEqualTo(WorkerHealthState.HEALTHY);
+    }
+
+    @Test
+    void scalingEventRoundTrip() throws Exception {
+        var event = new ScalingEvent(
+            UUID.randomUUID().toString(), Instant.now(),
+            ScalingAction.SCALE_UP, ScalingTriggerType.REACTIVE,
+            "CPU > 80% for 2 min", 3, 4,
+            List.of("auto-local-4"), List.of()
+        );
+
+        String json = mapper.writeValueAsString(event);
+        assertThat(json).contains("\"eventType\":\"SCALING_DECISION\"");
+
+        CloudBalancerEvent deserialized = mapper.readValue(json, CloudBalancerEvent.class);
+        assertThat(deserialized).isInstanceOf(ScalingEvent.class);
+        ScalingEvent typed = (ScalingEvent) deserialized;
+        assertThat(typed.action()).isEqualTo(ScalingAction.SCALE_UP);
+        assertThat(typed.previousWorkerCount()).isEqualTo(3);
+        assertThat(typed.newWorkerCount()).isEqualTo(4);
+    }
+
+    @Test
+    void drainCommandRoundTrip() throws Exception {
+        var cmd = new DrainCommand("worker-1", 60, Instant.now());
+        String json = mapper.writeValueAsString(cmd);
+        DrainCommand deserialized = mapper.readValue(json, DrainCommand.class);
+        assertThat(deserialized.workerId()).isEqualTo("worker-1");
+        assertThat(deserialized.drainTimeSeconds()).isEqualTo(60);
     }
 
     @Test

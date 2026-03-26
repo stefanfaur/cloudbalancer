@@ -14,7 +14,7 @@ class LocalThreadRuntimeTest {
     }
 
     @Test
-    void startWorkerRegistersIt() {
+    void startWorkerRegistersAndReturnsTrue() {
         var runtime = new LocalThreadRuntime();
         var config = new WorkerConfig(
             "test-worker-1",
@@ -22,7 +22,8 @@ class LocalThreadRuntimeTest {
             4, 8192, 10240,
             Set.of()
         );
-        runtime.startWorker(config);
+        boolean result = runtime.startWorker(config);
+        assertThat(result).isTrue();
         assertThat(runtime.listWorkers()).hasSize(1);
         assertThat(runtime.getWorkerInfo("test-worker-1")).isNotNull();
         assertThat(runtime.getWorkerInfo("test-worker-1").id()).isEqualTo("test-worker-1");

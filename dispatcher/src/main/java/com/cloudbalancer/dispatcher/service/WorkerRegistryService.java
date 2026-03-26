@@ -70,6 +70,14 @@ public class WorkerRegistryService {
         return workerRepository.findAll();
     }
 
+    public void drainWorker(String workerId) {
+        var worker = workerRepository.findById(workerId).orElseThrow(
+            () -> new IllegalArgumentException("Worker not found: " + workerId));
+        worker.setHealthState(WorkerHealthState.DRAINING);
+        workerRepository.save(worker);
+        log.info("Worker {} transitioned to DRAINING", workerId);
+    }
+
     public void allocateResources(String workerId, ResourceProfile profile) {
         var worker = workerRepository.findById(workerId).orElseThrow(
             () -> new IllegalArgumentException("Worker not found: " + workerId));

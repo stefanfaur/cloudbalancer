@@ -87,6 +87,30 @@ class WorkerRegistryServiceJpaTest {
         assertThat(available.getFirst().getId()).isEqualTo("w1");
     }
 
+    @Test
+    void getAvailableWorkersExcludesDraining() {
+        registerWorker("w1", 4, 2048, 500);
+        registerWorker("w2", 4, 2048, 500);
+
+        var w2 = workerRepository.findById("w2").orElseThrow();
+        w2.setHealthState(WorkerHealthState.DRAINING);
+        workerRepository.save(w2);
+
+        var available = workerRegistry.getAvailableWorkers();
+        assertThat(available).hasSize(1);
+        assertThat(available.get(0).getId()).isEqualTo("w1");
+    }
+
+    @Test
+    void drainWorkerTransitionsToDraining() {
+        registerWorker("w1", 4, 2048, 500);
+
+        workerRegistry.drainWorker("w1");
+
+        var w = workerRepository.findById("w1").orElseThrow();
+        assertThat(w.getHealthState()).isEqualTo(WorkerHealthState.DRAINING);
+    }
+
     private void registerWorker(String id, int cpu, int mem, int disk) {
         var caps = new WorkerCapabilities(
             Set.of(ExecutorType.SIMULATED),

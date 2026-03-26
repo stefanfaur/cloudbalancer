@@ -37,4 +37,14 @@ class HealthFilterTest {
         var result = filter.filter(anyTask(), List.of(dead));
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void excludesDrainingWorkers() {
+        var healthy = workerRecord("w1", WorkerHealthState.HEALTHY);
+        var draining = workerRecord("w2", WorkerHealthState.DRAINING);
+        var recovering = workerRecord("w3", WorkerHealthState.RECOVERING);
+
+        var result = filter.filter(anyTask(), List.of(healthy, draining, recovering));
+        assertThat(result).containsExactly(healthy, recovering);
+    }
 }

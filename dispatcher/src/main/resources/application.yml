@@ -41,6 +41,18 @@ cloudbalancer:
     liveness-check-interval-ms: 10000
     artifact-base-path: ${ARTIFACT_BASE_PATH:artifacts}
     artifact-max-size-bytes: ${ARTIFACT_MAX_SIZE_BYTES:104857600}
+    scaling:
+      enabled: true
+      runtime-mode: LOCAL
+      evaluation-interval-ms: 30000
+      cpu-high-threshold: 80.0
+      cpu-low-threshold: 30.0
+      reactive-window-seconds: 120
+      scale-down-window-seconds: 300
+      queue-pressure-window-seconds: 120
+      queue-pressure-ratio-threshold: 1.5
+      process-worker-jar-path: worker/build/libs/worker.jar
+      process-worker-kafka-bootstrap: localhost:9092
   retry:
     scan-interval-ms: 5000
     base-delay-seconds: 5

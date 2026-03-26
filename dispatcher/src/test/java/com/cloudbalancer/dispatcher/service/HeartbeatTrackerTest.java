@@ -134,6 +134,33 @@ class HeartbeatTrackerTest {
         verify(workerRepository, never()).save(any());
     }
 
+    @Test
+    void drainingWorkerNotPromotedOnHeartbeat() {
+        var worker = createWorker("w1", WorkerHealthState.DRAINING);
+        when(workerRepository.findById("w1")).thenReturn(Optional.of(worker));
+
+        tracker.onHeartbeat("w1", Instant.now());
+
+        assertThat(worker.getHealthState()).isEqualTo(WorkerHealthState.DRAINING);
+        verify(workerRepository, never()).save(any());
+    }
+
+    @Test
+    void drainingWorkerTransitionsToDeadWithoutRequeue() {
+        var worker = createWorker("w1", WorkerHealthState.DRAINING);
+
+        Instant longAgo = Instant.now().minusSeconds(120);
+        tracker.getLastSeenMap().put("w1", longAgo);
+
+        when(workerRepository.findAll()).thenReturn(List.of(worker));
+
+        tracker.checkLiveness();
+
+        assertThat(worker.getHealthState()).isEqualTo(WorkerHealthState.DEAD);
+        verify(workerRepository).save(worker);
+        verify(workerFailureHandler, never()).onWorkerDead("w1");
+    }
+
     private WorkerRecord createWorker(String id, WorkerHealthState healthState) {
         var caps = new WorkerCapabilities(
                 Set.of(ExecutorType.SIMULATED),
