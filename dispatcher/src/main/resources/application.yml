@@ -34,6 +34,8 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 cloudbalancer:
+  cors:
+    allowed-origins: http://localhost:5173
   dispatcher:
     assignment-interval-ms: 1000
     heartbeat-suspect-threshold-seconds: 30

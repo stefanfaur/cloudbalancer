@@ -74,6 +74,36 @@ class AuthControllerTest {
     }
 
     @Test
+    void logoutRevokesRefreshTokens() throws Exception {
+        userService.createUser("logouttest", "pass", Role.OPERATOR);
+        String loginBody = JsonUtil.mapper().writeValueAsString(new LoginRequest("logouttest", "pass"));
+
+        // Login
+        String loginResponse = mvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON).content(loginBody))
+            .andReturn().getResponse().getContentAsString();
+        String accessToken = JsonUtil.mapper().readTree(loginResponse).get("accessToken").asText();
+        String refreshToken = JsonUtil.mapper().readTree(loginResponse).get("refreshToken").asText();
+
+        // Logout
+        mvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isNoContent());
+
+        // Try to refresh — should fail since tokens are revoked
+        String refreshBody = JsonUtil.mapper().writeValueAsString(new RefreshRequest(refreshToken));
+        mvc.perform(post("/api/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON).content(refreshBody))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutWithoutAuthReturns401() throws Exception {
+        mvc.perform(post("/api/auth/logout"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void refreshTokenRotationInvalidatesOldToken() throws Exception {
         userService.createUser("rotatetest", "pass", Role.OPERATOR);
         String loginBody = JsonUtil.mapper().writeValueAsString(new LoginRequest("rotatetest", "pass"));

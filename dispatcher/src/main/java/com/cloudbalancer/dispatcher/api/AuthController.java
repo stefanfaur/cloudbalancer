@@ -6,6 +6,7 @@ import com.cloudbalancer.dispatcher.api.dto.RefreshRequest;
 import com.cloudbalancer.dispatcher.security.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.security.Principal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -16,12 +17,15 @@ public class AuthController {
     private final UserService userService;
     private final JwtService jwtService;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
 
     public AuthController(UserService userService, JwtService jwtService,
-                          RefreshTokenRepository refreshTokenRepository) {
+                          RefreshTokenRepository refreshTokenRepository,
+                          UserRepository userRepository) {
         this.userService = userService;
         this.jwtService = jwtService;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/login")
@@ -55,6 +59,18 @@ public class AuthController {
                 ));
             })
             .orElse(ResponseEntity.status(401).build());
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(Principal principal) {
+        return userRepository.findByUsername(principal.getName())
+            .map(user -> {
+                var tokens = refreshTokenRepository.findByUserAndRevokedFalse(user);
+                tokens.forEach(t -> t.setRevoked(true));
+                refreshTokenRepository.saveAll(tokens);
+                return ResponseEntity.noContent().<Void>build();
+            })
+            .orElse(ResponseEntity.notFound().build());
     }
 
     private String createRefreshToken(User user) {

@@ -34,5 +34,7 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 cloudbalancer:
+  cors:
+    allowed-origins: http://localhost:5173
   security:
     jwt-secret: dGhpc2lzYXZlcnlsb25nc2VjcmV0a2V5Zm9ydGVzdGluZzEyMzQ1Njc4OTA=

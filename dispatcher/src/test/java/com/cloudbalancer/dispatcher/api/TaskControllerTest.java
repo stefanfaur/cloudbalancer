@@ -2,6 +2,7 @@ package com.cloudbalancer.dispatcher.api;
 
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
+import com.cloudbalancer.dispatcher.api.dto.TaskPageResponse;
 import com.cloudbalancer.dispatcher.security.JwtService;
 import com.cloudbalancer.dispatcher.security.RateLimitFilter;
 import com.cloudbalancer.dispatcher.security.RateLimitProperties;
@@ -95,7 +96,7 @@ class TaskControllerTest {
 
     @Test
     @WithMockUser(roles = "VIEWER")
-    void listTasksReturnsAll() throws Exception {
+    void listTasksReturnsPagedResult() throws Exception {
         var descriptor = new TaskDescriptor(
             ExecutorType.SIMULATED, Map.of("durationMs", 1000),
             new ResourceProfile(1, 512, 256, false, 10, false),
@@ -104,10 +105,12 @@ class TaskControllerTest {
         );
         TaskEnvelope e1 = TaskEnvelope.create(descriptor);
         TaskEnvelope e2 = TaskEnvelope.create(descriptor);
-        when(taskService.listTasks()).thenReturn(List.of(e1, e2));
+        when(taskService.listTasks(any(int.class), any(int.class), any(), any(), any(), any(), any()))
+            .thenReturn(new TaskPageResponse(List.of(e1, e2), 2, 0, 50));
 
         mvc.perform(get("/api/tasks"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2));
+            .andExpect(jsonPath("$.tasks.length()").value(2))
+            .andExpect(jsonPath("$.total").value(2));
     }
 }

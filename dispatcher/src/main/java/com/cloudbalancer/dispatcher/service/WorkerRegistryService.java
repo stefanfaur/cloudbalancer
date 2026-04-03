@@ -95,6 +95,17 @@ public class WorkerRegistryService {
         workerRepository.save(worker);
     }
 
+    public Set<String> updateWorkerTags(String workerId, Set<String> tags) {
+        var worker = workerRepository.findById(workerId).orElseThrow(
+            () -> new IllegalArgumentException("Worker not found: " + workerId));
+        var caps = worker.getCapabilities();
+        var updated = new WorkerCapabilities(caps.supportedExecutors(), caps.totalResources(), tags);
+        worker.setCapabilities(updated);
+        workerRepository.save(worker);
+        log.info("Updated tags for worker {}: {}", workerId, tags);
+        return tags;
+    }
+
     public void rebuildResourceLedger() {
         log.info("Rebuilding resource ledger from persisted tasks...");
         var allWorkers = workerRepository.findAll();

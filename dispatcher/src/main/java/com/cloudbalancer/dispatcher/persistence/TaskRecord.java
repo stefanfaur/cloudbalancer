@@ -87,6 +87,7 @@ public class TaskRecord {
     public UUID getId() { return id; }
     public TaskState getState() { return state; }
     public Priority getPriority() { return priority; }
+    public void setPriority(Priority priority) { this.priority = priority; }
     public ExecutorType getExecutorType() { return executorType; }
     public Instant getSubmittedAt() { return submittedAt; }
     public String getAssignedWorkerId() { return assignedWorkerId; }
