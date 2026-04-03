@@ -1,5 +1,5 @@
 # docker/docker-compose.dev.yml
-# CloudBalancer development stack — Phase 5: Kafka + TimescaleDB + Metrics
+# CloudBalancer development stack — full service mesh
 
 services:
   kafka:
@@ -37,6 +37,41 @@ services:
       timeout: 3s
       retries: 5
 
+  dispatcher:
+    build:
+      context: ..
+      dockerfile: dispatcher/Dockerfile
+    container_name: cloudbalancer-dispatcher
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cloudbalancer
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile
+    container_name: cloudbalancer-worker-1
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      WORKER_ID: worker-1
+      DISPATCHER_URL: http://dispatcher:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      kafka:
+        condition: service_started
+      dispatcher:
+        condition: service_started
+
   metrics-aggregator:
     build:
       context: ..
@@ -47,6 +82,8 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cloudbalancer
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
     depends_on:
       kafka:
         condition: service_started
