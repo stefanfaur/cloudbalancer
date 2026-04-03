@@ -13,9 +13,11 @@ import java.util.UUID;
 public class TaskService {
 
     private final TaskRepository taskRepository;
+    private final AutoScalerService autoScalerService;
 
-    public TaskService(TaskRepository taskRepository) {
+    public TaskService(TaskRepository taskRepository, AutoScalerService autoScalerService) {
         this.taskRepository = taskRepository;
+        this.autoScalerService = autoScalerService;
     }
 
     public TaskEnvelope submitTask(TaskDescriptor descriptor) {
@@ -23,6 +25,7 @@ public class TaskService {
         record.transitionTo(TaskState.VALIDATED);
         record.transitionTo(TaskState.QUEUED);
         taskRepository.save(record);
+        autoScalerService.recordTaskSubmitted();
         return record.toEnvelope();
     }
 

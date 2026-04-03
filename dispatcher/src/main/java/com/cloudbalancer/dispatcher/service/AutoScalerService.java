@@ -2,12 +2,15 @@ package com.cloudbalancer.dispatcher.service;
 
 import com.cloudbalancer.common.event.ScalingEvent;
 import com.cloudbalancer.common.model.*;
+import com.cloudbalancer.common.model.TaskState;
 import com.cloudbalancer.common.runtime.NodeRuntime;
 import com.cloudbalancer.common.runtime.WorkerConfig;
 import com.cloudbalancer.dispatcher.config.ScalingProperties;
 import com.cloudbalancer.dispatcher.kafka.EventPublisher;
+import com.cloudbalancer.dispatcher.persistence.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -15,6 +18,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class AutoScalerService {
@@ -26,9 +30,15 @@ public class AutoScalerService {
     private final ScalingPolicyService policyService;
     private final EventPublisher eventPublisher;
     private final ScalingProperties props;
+    private final TaskRepository taskRepository;
 
     private final ConcurrentLinkedDeque<MetricsSample> metricsWindow = new ConcurrentLinkedDeque<>();
     private final AtomicInteger autoWorkerCounter = new AtomicInteger(0);
+
+    // Queue-pressure tracking: sliding counters for submission and completion rates
+    private final AtomicLong submittedCounter = new AtomicLong(0);
+    private final AtomicLong completedCounter = new AtomicLong(0);
+    private final ConcurrentLinkedDeque<RateSnapshot> rateWindow = new ConcurrentLinkedDeque<>();
 
     private volatile Instant lastScalingAction = Instant.EPOCH;
     private volatile ScalingDecision lastDecision;
@@ -41,16 +51,59 @@ public class AutoScalerService {
                              WorkerRegistryService workerRegistry,
                              ScalingPolicyService policyService,
                              EventPublisher eventPublisher,
-                             ScalingProperties props) {
+                             ScalingProperties props,
+                             TaskRepository taskRepository) {
         this.nodeRuntime = nodeRuntime;
         this.workerRegistry = workerRegistry;
         this.policyService = policyService;
         this.eventPublisher = eventPublisher;
         this.props = props;
+        this.taskRepository = taskRepository;
     }
 
     public void recordMetrics(String workerId, double cpuPercent) {
         metricsWindow.addLast(new MetricsSample(effectiveNow(), cpuPercent, workerId));
+    }
+
+    public void recordTaskSubmitted() {
+        submittedCounter.incrementAndGet();
+    }
+
+    public void recordTaskCompleted() {
+        completedCounter.incrementAndGet();
+    }
+
+    @Scheduled(fixedDelayString = "${cloudbalancer.dispatcher.scaling.evaluation-interval-ms:30000}")
+    public void scheduledEvaluate() {
+        if (!props.isEnabled()) return;
+
+        updateQueueEmptySince();
+        snapshotRates();
+        evaluate();
+    }
+
+    private void updateQueueEmptySince() {
+        long queuedCount = taskRepository.countByState(TaskState.QUEUED);
+        if (queuedCount == 0) {
+            if (queueEmptySince == null) {
+                queueEmptySince = effectiveNow();
+            }
+        } else {
+            queueEmptySince = null;
+        }
+    }
+
+    private void snapshotRates() {
+        Instant now = effectiveNow();
+        long submitted = submittedCounter.get();
+        long completed = completedCounter.get();
+        rateWindow.addLast(new RateSnapshot(now, submitted, completed));
+
+        // Prune old snapshots
+        Instant cutoff = now.minus(Duration.ofSeconds(props.getQueuePressureWindowSeconds()));
+        while (!rateWindow.isEmpty() && rateWindow.peekFirst().timestamp().isBefore(cutoff)) {
+            rateWindow.pollFirst();
+        }
     }
 
     public void evaluate() {
@@ -92,6 +145,39 @@ public class AutoScalerService {
                         avgCpu, props.getCpuHighThreshold(), props.getReactiveWindowSeconds()),
                     currentCount, policy);
                 return;
+            }
+        }
+
+        // Queue-pressure scale-up: submission rate outpacing completion rate
+        if (currentCount < policy.maxWorkers() && rateWindow.size() >= 2) {
+            RateSnapshot oldest = rateWindow.peekFirst();
+            RateSnapshot newest = rateWindow.peekLast();
+            long submittedDelta = newest.totalSubmitted() - oldest.totalSubmitted();
+            long completedDelta = newest.totalCompleted() - oldest.totalCompleted();
+
+            if (completedDelta > 0) {
+                double pressureRatio = (double) submittedDelta / completedDelta;
+                if (pressureRatio >= props.getQueuePressureRatioThreshold()) {
+                    int toAdd = Math.min(1, policy.maxWorkers() - currentCount);
+                    if (toAdd > 0) {
+                        scaleUp(toAdd, ScalingTriggerType.QUEUE_PRESSURE,
+                            String.format("Queue pressure ratio %.2f >= %.2f threshold over %ds window",
+                                pressureRatio, props.getQueuePressureRatioThreshold(),
+                                props.getQueuePressureWindowSeconds()),
+                            currentCount, policy);
+                        return;
+                    }
+                }
+            } else if (submittedDelta > 0) {
+                // Tasks being submitted but none completing — pressure is high
+                int toAdd = Math.min(1, policy.maxWorkers() - currentCount);
+                if (toAdd > 0) {
+                    scaleUp(toAdd, ScalingTriggerType.QUEUE_PRESSURE,
+                        String.format("Queue pressure: %d submitted, 0 completed over %ds window",
+                            submittedDelta, props.getQueuePressureWindowSeconds()),
+                        currentCount, policy);
+                    return;
+                }
             }
         }
 
@@ -246,6 +332,9 @@ public class AutoScalerService {
 
     public void resetForTest() {
         metricsWindow.clear();
+        rateWindow.clear();
+        submittedCounter.set(0);
+        completedCounter.set(0);
         lastScalingAction = Instant.EPOCH;
         lastDecision = null;
         queueEmptySince = null;
@@ -261,4 +350,5 @@ public class AutoScalerService {
     }
 
     record MetricsSample(Instant timestamp, double cpuPercent, String workerId) {}
+    record RateSnapshot(Instant timestamp, long totalSubmitted, long totalCompleted) {}
 }

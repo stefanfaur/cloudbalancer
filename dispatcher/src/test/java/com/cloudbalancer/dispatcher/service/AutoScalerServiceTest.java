@@ -6,6 +6,7 @@ import com.cloudbalancer.common.runtime.NodeRuntime;
 import com.cloudbalancer.common.runtime.WorkerConfig;
 import com.cloudbalancer.dispatcher.config.ScalingProperties;
 import com.cloudbalancer.dispatcher.kafka.EventPublisher;
+import com.cloudbalancer.dispatcher.persistence.TaskRepository;
 import com.cloudbalancer.dispatcher.persistence.WorkerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +32,7 @@ class AutoScalerServiceTest {
     @Mock WorkerRegistryService workerRegistry;
     @Mock ScalingPolicyService policyService;
     @Mock EventPublisher eventPublisher;
+    @Mock TaskRepository taskRepository;
 
     AutoScalerService autoScaler;
 
@@ -37,7 +40,8 @@ class AutoScalerServiceTest {
     void setUp() {
         lenient().when(nodeRuntime.startWorker(any())).thenReturn(true);
         lenient().when(policyService.getCurrentPolicy()).thenReturn(ScalingPolicy.defaults());
-        autoScaler = new AutoScalerService(nodeRuntime, workerRegistry, policyService, eventPublisher, scalingProperties());
+        lenient().when(taskRepository.countByState(any())).thenReturn(0L);
+        autoScaler = new AutoScalerService(nodeRuntime, workerRegistry, policyService, eventPublisher, scalingProperties(), taskRepository);
     }
 
     @Test
@@ -185,6 +189,72 @@ class AutoScalerServiceTest {
         autoScaler.evaluate();
 
         verify(workerRegistry, never()).drainWorker(anyString());
+    }
+
+    @Test
+    void scalesUpOnQueuePressure() {
+        var workers = List.of(makeWorkerRecord("w1", WorkerHealthState.HEALTHY));
+        when(workerRegistry.getAllWorkers()).thenReturn(workers);
+        when(workerRegistry.getAvailableWorkers()).thenReturn(workers);
+
+        // Record low CPU so reactive signal won't fire
+        autoScaler.recordMetrics("w1", 50.0);
+
+        // First snapshot: 0 submitted, 0 completed (counters start at 0)
+        autoScaler.scheduledEvaluate();  // snapshot 1
+
+        // Simulate queue pressure: 10 submitted, 2 completed -> ratio 5.0 > 1.5
+        for (int i = 0; i < 10; i++) autoScaler.recordTaskSubmitted();
+        for (int i = 0; i < 2; i++) autoScaler.recordTaskCompleted();
+
+        // Need to keep CPU metrics in the window for evaluate() to not return early
+        autoScaler.recordMetrics("w1", 50.0);
+        autoScaler.scheduledEvaluate();  // snapshot 2 + evaluate with delta
+
+        verify(nodeRuntime, atLeastOnce()).startWorker(any(WorkerConfig.class));
+        var decision = autoScaler.getLastDecision();
+        assertThat(decision).isNotNull();
+        assertThat(decision.action()).isEqualTo(ScalingAction.SCALE_UP);
+        assertThat(decision.triggerType()).isEqualTo(ScalingTriggerType.QUEUE_PRESSURE);
+    }
+
+    @Test
+    void noQueuePressureScaleUpWhenRatioIsLow() {
+        var workers = List.of(makeWorkerRecord("w1", WorkerHealthState.HEALTHY));
+        lenient().when(workerRegistry.getAllWorkers()).thenReturn(workers);
+        lenient().when(workerRegistry.getAvailableWorkers()).thenReturn(workers);
+
+        autoScaler.recordMetrics("w1", 50.0);
+
+        // Balanced: 5 submitted, 5 completed -> ratio 1.0 < 1.5
+        for (int i = 0; i < 5; i++) autoScaler.recordTaskSubmitted();
+        for (int i = 0; i < 5; i++) autoScaler.recordTaskCompleted();
+        autoScaler.scheduledEvaluate();
+
+        for (int i = 0; i < 5; i++) autoScaler.recordTaskSubmitted();
+        for (int i = 0; i < 5; i++) autoScaler.recordTaskCompleted();
+        autoScaler.scheduledEvaluate();
+
+        verify(nodeRuntime, never()).startWorker(any());
+    }
+
+    @Test
+    void scheduledEvaluateUpdatesQueueEmptySince() {
+        var workers = List.of(makeWorkerRecord("w1", WorkerHealthState.HEALTHY));
+        lenient().when(workerRegistry.getAllWorkers()).thenReturn(workers);
+        lenient().when(workerRegistry.getAvailableWorkers()).thenReturn(workers);
+
+        // Queue has tasks — queueEmptySince should be null
+        when(taskRepository.countByState(any())).thenReturn(5L);
+        autoScaler.recordMetrics("w1", 50.0);
+        autoScaler.scheduledEvaluate();
+
+        // Now empty queue
+        when(taskRepository.countByState(any())).thenReturn(0L);
+        autoScaler.scheduledEvaluate();
+
+        // No direct assertion on queueEmptySince (private), but confirm no crash
+        // The scale-down path tests queueEmptySince indirectly
     }
 
     // Helper methods

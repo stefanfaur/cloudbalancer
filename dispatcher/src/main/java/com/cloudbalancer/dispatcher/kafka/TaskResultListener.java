@@ -5,6 +5,7 @@ import com.cloudbalancer.common.event.TaskStateChangedEvent;
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
 import com.cloudbalancer.dispatcher.persistence.TaskRecord;
+import com.cloudbalancer.dispatcher.service.AutoScalerService;
 import com.cloudbalancer.dispatcher.service.TaskService;
 import com.cloudbalancer.dispatcher.service.WorkerRegistryService;
 import com.cloudbalancer.dispatcher.util.BackoffCalculator;
@@ -23,14 +24,16 @@ public class TaskResultListener {
     private final TaskService taskService;
     private final WorkerRegistryService workerRegistryService;
     private final EventPublisher eventPublisher;
+    private final AutoScalerService autoScalerService;
     private final long baseDelaySeconds;
 
     public TaskResultListener(TaskService taskService, WorkerRegistryService workerRegistryService,
-                              EventPublisher eventPublisher,
+                              EventPublisher eventPublisher, AutoScalerService autoScalerService,
                               @Value("${cloudbalancer.retry.base-delay-seconds:5}") long baseDelaySeconds) {
         this.taskService = taskService;
         this.workerRegistryService = workerRegistryService;
         this.eventPublisher = eventPublisher;
+        this.autoScalerService = autoScalerService;
         this.baseDelaySeconds = baseDelaySeconds;
     }
 
@@ -107,6 +110,11 @@ public class TaskResultListener {
             record.setLastStderr(result.stderr());
 
             taskService.updateTask(record);
+
+            // Notify auto-scaler of task completion for queue-pressure tracking
+            if (record.getState().isTerminal()) {
+                autoScalerService.recordTaskCompleted();
+            }
 
             // Release resource ledger on terminal state
             if (record.getState().isTerminal() && record.getAssignedWorkerId() != null) {
