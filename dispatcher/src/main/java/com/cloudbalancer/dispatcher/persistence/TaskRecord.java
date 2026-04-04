@@ -65,13 +65,14 @@ public class TaskRecord {
     protected TaskRecord() {}
 
     public static TaskRecord create(TaskDescriptor descriptor) {
+        var normalized = descriptor.withDefaults();
         var record = new TaskRecord();
         record.id = UUID.randomUUID();
         record.state = TaskState.SUBMITTED;
-        record.priority = descriptor.priority();
-        record.executorType = descriptor.executorType();
+        record.priority = normalized.priority();
+        record.executorType = normalized.executorType();
         record.submittedAt = Instant.now();
-        record.descriptor = descriptor;
+        record.descriptor = normalized;
         record.executionHistory = new ArrayList<>();
         record.currentExecutionId = UUID.randomUUID();
         return record;

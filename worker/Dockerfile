@@ -3,5 +3,5 @@ FROM eclipse-temurin:21-jre-alpine
 RUN apk add --no-cache python3 docker-cli
 
 WORKDIR /app
-COPY build/libs/*.jar app.jar
+COPY worker/build/libs/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]

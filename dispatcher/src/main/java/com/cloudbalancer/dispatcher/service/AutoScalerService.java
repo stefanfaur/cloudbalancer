@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -235,11 +237,14 @@ public class AutoScalerService {
         return Math.max(0, cooldown - elapsed);
     }
 
-    public String getRuntimeMode() {
-        return props.getRuntimeMode();
-    }
-
     // --- Private helpers ---
+
+    private Set<ExecutorType> parseExecutorTypes() {
+        return Arrays.stream(props.getDefaultWorkerExecutorTypes().split(","))
+            .map(String::trim)
+            .map(ExecutorType::valueOf)
+            .collect(Collectors.toSet());
+    }
 
     private int computeScaleUpStep(double avgCpu) {
         if (avgCpu > 95.0) return 3;
@@ -251,9 +256,10 @@ public class AutoScalerService {
                                      int currentCount, ScalingPolicy policy) {
         List<String> added = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            String workerId = "auto-local-" + autoWorkerCounter.incrementAndGet();
-            var config = new WorkerConfig(workerId, Set.of(ExecutorType.SIMULATED),
-                4, 8192, 10240, Set.of());
+            String workerId = "auto-docker-" + autoWorkerCounter.incrementAndGet();
+            var config = new WorkerConfig(workerId, parseExecutorTypes(),
+                props.getDefaultWorkerCpuCores(), props.getDefaultWorkerMemoryMb(),
+                props.getDefaultWorkerDiskMb(), Set.of());
             boolean ok = nodeRuntime.startWorker(config);
             if (ok) {
                 added.add(workerId);
@@ -290,6 +296,7 @@ public class AutoScalerService {
                 continue;
             }
             workerRegistry.drainWorker(workerId);
+            nodeRuntime.drainAndStop(workerId, props.getDrainTimeSeconds());
             removed.add(workerId);
             log.info("Scale-down: draining worker {}", workerId);
         }

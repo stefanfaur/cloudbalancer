@@ -55,6 +55,12 @@ public class TaskResultListener {
                 return;
             }
 
+            // Guard against duplicate Kafka delivery — task already reached a terminal state
+            if (record.getState().isTerminal()) {
+                log.info("Ignoring duplicate result for task {} (already {})", result.taskId(), record.getState());
+                return;
+            }
+
             TaskState previousState = record.getState();
 
             // Fast-forward through intermediate states

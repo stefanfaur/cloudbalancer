@@ -49,8 +49,7 @@ class ScalingControllerTest {
                 .header("Authorization", "Bearer " + adminToken()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.policy.minWorkers").value(2))
-            .andExpect(jsonPath("$.policy.maxWorkers").value(20))
-            .andExpect(jsonPath("$.runtimeMode").value("LOCAL"));
+            .andExpect(jsonPath("$.policy.maxWorkers").value(20));
     }
 
     @Test
@@ -98,8 +97,7 @@ class ScalingControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.workerCount").isNumber())
-            .andExpect(jsonPath("$.runtimeMode").value("LOCAL"));
+            .andExpect(jsonPath("$.workerCount").isNumber());
 
         // Verify status shows lastDecision
         mvc.perform(get("/api/scaling/status")

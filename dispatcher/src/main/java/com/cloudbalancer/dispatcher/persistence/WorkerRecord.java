@@ -40,6 +40,9 @@ public class WorkerRecord {
     @Column(name = "recovery_started_at")
     private Instant recoveryStartedAt;
 
+    @Column(name = "drain_started_at")
+    private Instant drainStartedAt;
+
     protected WorkerRecord() {}
 
     public WorkerRecord(String id, WorkerHealthState healthState,
@@ -51,16 +54,20 @@ public class WorkerRecord {
     }
 
     public void allocateResources(ResourceProfile profile) {
-        this.allocatedCpu += profile.cpuCores();
-        this.allocatedMemoryMb += profile.memoryMB();
-        this.allocatedDiskMb += profile.diskMB();
+        if (profile != null) {
+            this.allocatedCpu += profile.cpuCores();
+            this.allocatedMemoryMb += profile.memoryMB();
+            this.allocatedDiskMb += profile.diskMB();
+        }
         this.activeTaskCount++;
     }
 
     public void releaseResources(ResourceProfile profile) {
-        this.allocatedCpu = Math.max(0, this.allocatedCpu - profile.cpuCores());
-        this.allocatedMemoryMb = Math.max(0, this.allocatedMemoryMb - profile.memoryMB());
-        this.allocatedDiskMb = Math.max(0, this.allocatedDiskMb - profile.diskMB());
+        if (profile != null) {
+            this.allocatedCpu = Math.max(0, this.allocatedCpu - profile.cpuCores());
+            this.allocatedMemoryMb = Math.max(0, this.allocatedMemoryMb - profile.memoryMB());
+            this.allocatedDiskMb = Math.max(0, this.allocatedDiskMb - profile.diskMB());
+        }
         this.activeTaskCount = Math.max(0, this.activeTaskCount - 1);
     }
 
@@ -84,4 +91,6 @@ public class WorkerRecord {
     public int getActiveTaskCount() { return activeTaskCount; }
     public Instant getRecoveryStartedAt() { return recoveryStartedAt; }
     public void setRecoveryStartedAt(Instant recoveryStartedAt) { this.recoveryStartedAt = recoveryStartedAt; }
+    public Instant getDrainStartedAt() { return drainStartedAt; }
+    public void setDrainStartedAt(Instant drainStartedAt) { this.drainStartedAt = drainStartedAt; }
 }

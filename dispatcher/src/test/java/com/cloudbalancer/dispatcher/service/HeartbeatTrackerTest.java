@@ -146,7 +146,7 @@ class HeartbeatTrackerTest {
     }
 
     @Test
-    void drainingWorkerTransitionsToDeadWithoutRequeue() {
+    void drainingWorkerTransitionsToDeadAndRequeues() {
         var worker = createWorker("w1", WorkerHealthState.DRAINING);
 
         Instant longAgo = Instant.now().minusSeconds(120);
@@ -158,7 +158,8 @@ class HeartbeatTrackerTest {
 
         assertThat(worker.getHealthState()).isEqualTo(WorkerHealthState.DEAD);
         verify(workerRepository).save(worker);
-        verify(workerFailureHandler, never()).onWorkerDead("w1");
+        // Always re-queue in-flight tasks, even for DRAINING workers
+        verify(workerFailureHandler).onWorkerDead("w1");
     }
 
     private WorkerRecord createWorker(String id, WorkerHealthState healthState) {

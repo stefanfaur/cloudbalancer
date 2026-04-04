@@ -13,7 +13,7 @@ public class ResourceAvailabilityScorer implements WorkerScorer {
     @Override
     public int score(TaskRecord task, WorkerRecord worker) {
         ResourceProfile total = worker.getCapabilities().totalResources();
-        if (total.cpuCores() == 0 && total.memoryMB() == 0 && total.diskMB() == 0) {
+        if (total == null || (total.cpuCores() == 0 && total.memoryMB() == 0 && total.diskMB() == 0)) {
             return 0;
         }
 

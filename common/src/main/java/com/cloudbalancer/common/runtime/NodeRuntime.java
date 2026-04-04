@@ -8,4 +8,8 @@ public interface NodeRuntime {
     void stopWorker(String workerId);
     WorkerInfo getWorkerInfo(String workerId);
     List<WorkerInfo> listWorkers();
+
+    default void drainAndStop(String workerId, int drainTimeSeconds) {
+        // Default no-op; DockerRuntime overrides with Kafka drain command + delayed stop
+    }
 }

@@ -47,8 +47,7 @@ public class ScalingController {
             total, active, draining,
             policyService.getCurrentPolicy(),
             autoScaler.getLastDecision(),
-            autoScaler.getCooldownRemainingSeconds(),
-            autoScaler.getRuntimeMode()
+            autoScaler.getCooldownRemainingSeconds()
         );
     }
 

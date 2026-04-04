@@ -29,6 +29,12 @@ subprojects {
         testImplementation(rootProject.libs.assertj.core)
     }
 
+    // Spring Boot plugin produces a fat JAR via bootJar; disable the plain jar
+    // to avoid Docker COPY *.jar picking up the wrong artifact.
+    plugins.withId("org.springframework.boot") {
+        tasks.named<Jar>("jar") { enabled = false }
+    }
+
     tasks.withType<Test> {
         useJUnitPlatform()
 

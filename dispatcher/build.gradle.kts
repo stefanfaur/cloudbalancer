@@ -19,6 +19,8 @@ dependencies {
     implementation(libs.resilience4j.spring.boot3)
     implementation(libs.resilience4j.micrometer)
     implementation(libs.spring.boot.starter.websocket)
+    implementation(libs.docker.java.core)
+    implementation(libs.docker.java.transport)
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.boot.webmvc.test)

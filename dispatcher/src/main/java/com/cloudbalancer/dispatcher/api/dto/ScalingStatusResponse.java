@@ -9,6 +9,5 @@ public record ScalingStatusResponse(
     int drainingWorkerCount,
     ScalingPolicy policy,
     ScalingDecision lastDecision,
-    long cooldownRemainingSeconds,
-    String runtimeMode
+    long cooldownRemainingSeconds
 ) {}

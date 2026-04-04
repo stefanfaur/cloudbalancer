@@ -152,7 +152,6 @@ export interface ScalingStatusResponse {
   policy: ScalingPolicy
   lastDecision?: ScalingDecision
   cooldownRemainingSeconds: number
-  runtimeMode: string
 }
 
 // Auth types

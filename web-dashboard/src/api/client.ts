@@ -1,5 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080"
-const METRICS_URL = import.meta.env.VITE_METRICS_URL ?? "http://localhost:8081"
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost"
+const METRICS_URL = import.meta.env.VITE_METRICS_URL ?? "http://localhost"
 
 type TokenGetter = () => string | null
 type RefreshFn = () => Promise<boolean>

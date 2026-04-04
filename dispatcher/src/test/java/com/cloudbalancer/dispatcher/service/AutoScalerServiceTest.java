@@ -138,6 +138,24 @@ class AutoScalerServiceTest {
         autoScaler.evaluate();
 
         verify(workerRegistry).drainWorker(anyString());
+        verify(nodeRuntime).drainAndStop(anyString(), eq(60));
+    }
+
+    @Test
+    void manualScaleDownCallsDrainAndStop() {
+        var policy = new ScalingPolicy(1, 20, Duration.ofSeconds(1), 1, 1, Duration.ofSeconds(60));
+        when(policyService.getCurrentPolicy()).thenReturn(policy);
+
+        var workers = List.of(
+            makeWorkerRecord("w1", WorkerHealthState.HEALTHY),
+            makeWorkerRecord("w2", WorkerHealthState.HEALTHY)
+        );
+        when(workerRegistry.getAvailableWorkers()).thenReturn(workers);
+
+        autoScaler.triggerManual(ScalingAction.SCALE_DOWN, 1);
+
+        verify(workerRegistry).drainWorker(anyString());
+        verify(nodeRuntime).drainAndStop(anyString(), eq(60));
     }
 
     @Test
@@ -261,7 +279,6 @@ class AutoScalerServiceTest {
     private ScalingProperties scalingProperties() {
         var props = new ScalingProperties();
         props.setEnabled(true);
-        props.setRuntimeMode("LOCAL");
         props.setEvaluationIntervalMs(30000);
         props.setCpuHighThreshold(80.0);
         props.setCpuLowThreshold(30.0);

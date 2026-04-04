@@ -139,8 +139,8 @@ public class PythonExecutor implements TaskExecutor {
             // Build the command
             List<String> command = new ArrayList<>();
 
-            // On Linux, apply network isolation when not required
-            if (!networkAccessRequired && isLinux()) {
+            // On Linux, apply network isolation when not required (skip inside containers)
+            if (!networkAccessRequired && isLinux() && !isRunningInContainer()) {
                 command.add("unshare");
                 command.add("--net");
             }
@@ -246,6 +246,10 @@ public class PythonExecutor implements TaskExecutor {
 
     private static boolean isLinux() {
         return System.getProperty("os.name").toLowerCase().contains("linux");
+    }
+
+    private static boolean isRunningInContainer() {
+        return Files.exists(Path.of("/.dockerenv")) || Files.exists(Path.of("/run/.containerenv"));
     }
 
     private static void deleteDirectoryQuietly(Path dir) {

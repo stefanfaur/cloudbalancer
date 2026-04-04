@@ -4,7 +4,6 @@ import com.cloudbalancer.common.event.CloudBalancerEvent;
 import com.cloudbalancer.common.event.ScalingEvent;
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
-import com.cloudbalancer.dispatcher.persistence.WorkerRecord;
 import com.cloudbalancer.dispatcher.persistence.WorkerRepository;
 import com.cloudbalancer.dispatcher.service.AutoScalerService;
 import com.cloudbalancer.dispatcher.service.ScalingPolicyService;
@@ -33,8 +32,7 @@ import static org.awaitility.Awaitility.await;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
-        "cloudbalancer.dispatcher.scaling.enabled=true",
-        "cloudbalancer.dispatcher.scaling.runtime-mode=LOCAL"
+        "cloudbalancer.dispatcher.scaling.enabled=true"
     }
 )
 @Import(TestContainersConfig.class)

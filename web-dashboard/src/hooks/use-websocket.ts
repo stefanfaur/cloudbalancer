@@ -4,7 +4,7 @@ import { useAuth } from "./use-auth"
 import { useAlerts } from "./use-alerts"
 import type { WsMessage } from "@/api/types"
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8080"
+const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost"
 const MAX_BACKOFF = 30_000
 const DEBOUNCE_MS = 500
 

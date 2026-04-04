@@ -50,7 +50,7 @@ function LogViewer({ taskId, stdout, stderr, isRunning }: { taskId: string; stdo
 
   useEffect(() => {
     if (!isRunning || !accessToken) return
-    const wsUrl = (import.meta.env.VITE_WS_URL ?? "ws://localhost:8080")
+    const wsUrl = (import.meta.env.VITE_WS_URL ?? "ws://localhost")
     const ws = new WebSocket(`${wsUrl}/api/tasks/${taskId}/logs/stream?token=${accessToken}`)
     wsRef.current = ws
 

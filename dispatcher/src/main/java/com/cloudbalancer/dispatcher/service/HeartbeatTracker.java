@@ -69,16 +69,12 @@ public class HeartbeatTracker {
 
             if (secondsSinceLastSeen >= deadThresholdSeconds
                     && worker.getHealthState() != WorkerHealthState.DEAD) {
-                boolean wasDraining = worker.getHealthState() == WorkerHealthState.DRAINING;
                 worker.setHealthState(WorkerHealthState.DEAD);
                 workerRepository.save(worker);
                 log.info("Worker {} transitioned to DEAD ({}s since last seen)",
                         worker.getId(), secondsSinceLastSeen);
-                if (!wasDraining) {
-                    workerFailureHandler.onWorkerDead(worker.getId());
-                } else {
-                    log.info("Worker {} was DRAINING — skipping task re-queue", worker.getId());
-                }
+                // Always re-queue in-flight tasks, even for DRAINING workers
+                workerFailureHandler.onWorkerDead(worker.getId());
             } else if (secondsSinceLastSeen >= suspectThresholdSeconds
                     && worker.getHealthState() == WorkerHealthState.HEALTHY) {
                 worker.setHealthState(WorkerHealthState.SUSPECT);

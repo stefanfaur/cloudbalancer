@@ -94,7 +94,6 @@ export const handlers = [
       drainingWorkerCount: 0,
       policy: { minWorkers: 1, maxWorkers: 10, cooldownSeconds: 60, scaleUpStep: 1, scaleDownStep: 1, drainTimeSeconds: 30 },
       cooldownRemainingSeconds: 0,
-      runtimeMode: "AUTO",
     })
   }),
 

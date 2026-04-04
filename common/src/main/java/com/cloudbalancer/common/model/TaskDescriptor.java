@@ -12,4 +12,20 @@ public record TaskDescriptor(
     Priority priority,
     ExecutionPolicy executionPolicy,
     TaskIO io
-) {}
+) {
+    /**
+     * Returns a copy with null optional fields replaced by sensible defaults.
+     * ResourceProfile and TaskIO remain nullable (legitimately optional).
+     */
+    public TaskDescriptor withDefaults() {
+        return new TaskDescriptor(
+            executorType,
+            executionSpec,
+            resourceProfile,
+            constraints != null ? constraints : TaskConstraints.unconstrained(),
+            priority != null ? priority : Priority.NORMAL,
+            executionPolicy != null ? executionPolicy : ExecutionPolicy.defaults(),
+            io
+        );
+    }
+}

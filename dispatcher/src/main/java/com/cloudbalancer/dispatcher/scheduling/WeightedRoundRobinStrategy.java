@@ -27,7 +27,9 @@ public class WeightedRoundRobinStrategy implements SchedulingStrategy {
         int totalWeight = 0;
         for (int i = 0; i < candidates.size(); i++) {
             ResourceProfile total = candidates.get(i).getCapabilities().totalResources();
-            int weight = Math.max(1, total.cpuCores() + total.memoryMB() / 256 + total.diskMB() / 256);
+            int weight = (total != null)
+                ? Math.max(1, total.cpuCores() + total.memoryMB() / 256 + total.diskMB() / 256)
+                : 1;
             totalWeight += weight;
             cumulativeWeights[i] = totalWeight;
         }

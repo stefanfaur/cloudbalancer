@@ -6,16 +6,13 @@ import com.cloudbalancer.common.executor.ShellExecutor;
 import com.cloudbalancer.common.executor.SimulatedExecutor;
 import com.cloudbalancer.common.executor.TaskExecutor;
 import com.cloudbalancer.common.model.ExecutorType;
-import com.github.dockerjava.api.DockerClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 class ExecutorConfigTest {
 
@@ -30,7 +27,7 @@ class ExecutorConfigTest {
     void whenSimulatedConfigured_thenSimulatedExecutorCreated() {
         WorkerProperties props = buildProperties(Set.of(ExecutorType.SIMULATED));
 
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.empty());
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props);
 
         assertThat(executors).hasSize(1);
         assertThat(executors.get(0)).isInstanceOf(SimulatedExecutor.class);
@@ -42,7 +39,7 @@ class ExecutorConfigTest {
         props.getShell().setBlockedCommands(Set.of("rm -rf /", "shutdown"));
         props.getShell().setMaxOutputBytes(512_000);
 
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.empty());
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props);
 
         assertThat(executors).hasSize(1);
         assertThat(executors.get(0)).isInstanceOf(ShellExecutor.class);
@@ -53,7 +50,7 @@ class ExecutorConfigTest {
     void whenOnlySimulatedConfigured_thenNoShellOrDockerExecutors() {
         WorkerProperties props = buildProperties(Set.of(ExecutorType.SIMULATED));
 
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.empty());
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props);
 
         assertThat(executors).hasSize(1);
         assertThat(executors).noneMatch(e -> e instanceof ShellExecutor);
@@ -64,7 +61,7 @@ class ExecutorConfigTest {
     void whenMultipleExecutorsConfigured_thenAllCreated() {
         WorkerProperties props = buildProperties(Set.of(ExecutorType.SIMULATED, ExecutorType.SHELL));
 
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.empty());
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props);
 
         assertThat(executors).hasSize(2);
         assertThat(executors).anyMatch(e -> e instanceof SimulatedExecutor);
@@ -72,49 +69,28 @@ class ExecutorConfigTest {
     }
 
     @Test
-    void whenDockerConfiguredWithClient_thenDockerExecutorCreated() {
+    void whenDockerConfigured_thenDockerExecutorCreated() {
         WorkerProperties props = buildProperties(Set.of(ExecutorType.DOCKER));
-        DockerClient mockClient = mock(DockerClient.class);
 
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.of(mockClient));
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props);
 
         assertThat(executors).hasSize(1);
         assertThat(executors.get(0)).isInstanceOf(DockerExecutor.class);
     }
 
     @Test
-    void whenDockerConfiguredButNoClient_thenDockerExecutorNotCreated() {
-        WorkerProperties props = buildProperties(Set.of(ExecutorType.DOCKER));
-
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.empty());
-
-        assertThat(executors).isEmpty();
-    }
-
-    @Test
-    void whenDockerNotInSupportedExecutors_thenDockerClientIsEmpty() {
-        WorkerProperties props = buildProperties(Set.of(ExecutorType.SIMULATED));
-
-        Optional<DockerClient> client = executorConfig.dockerClient(props);
-
-        assertThat(client).isEmpty();
-    }
-
-    @Test
     void executorListMatchesConfiguredTypes() {
-        WorkerProperties props = buildProperties(Set.of(ExecutorType.SIMULATED, ExecutorType.SHELL, ExecutorType.DOCKER));
-        DockerClient mockClient = mock(DockerClient.class);
+        WorkerProperties props = buildProperties(Set.of(ExecutorType.SIMULATED, ExecutorType.SHELL));
 
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.of(mockClient));
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props);
 
-        assertThat(executors).hasSize(3);
+        assertThat(executors).hasSize(2);
         Set<ExecutorType> types = Set.of(
                 executors.get(0).getExecutorType(),
-                executors.get(1).getExecutorType(),
-                executors.get(2).getExecutorType()
+                executors.get(1).getExecutorType()
         );
         assertThat(types).containsExactlyInAnyOrder(
-                ExecutorType.SIMULATED, ExecutorType.SHELL, ExecutorType.DOCKER
+                ExecutorType.SIMULATED, ExecutorType.SHELL
         );
     }
 
@@ -122,7 +98,7 @@ class ExecutorConfigTest {
     void whenPythonConfigured_thenPythonExecutorCreated() {
         WorkerProperties props = buildProperties(Set.of(ExecutorType.PYTHON));
 
-        List<TaskExecutor> executors = executorConfig.taskExecutors(props, Optional.empty());
+        List<TaskExecutor> executors = executorConfig.taskExecutors(props);
 
         assertThat(executors).hasSize(1);
         assertThat(executors.get(0)).isInstanceOf(PythonExecutor.class);

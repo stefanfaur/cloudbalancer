@@ -74,8 +74,17 @@ public class WorkerRegistryService {
         var worker = workerRepository.findById(workerId).orElseThrow(
             () -> new IllegalArgumentException("Worker not found: " + workerId));
         worker.setHealthState(WorkerHealthState.DRAINING);
+        worker.setDrainStartedAt(Instant.now());
         workerRepository.save(worker);
         log.info("Worker {} transitioned to DRAINING", workerId);
+    }
+
+    public void markDead(String workerId) {
+        workerRepository.findById(workerId).ifPresent(worker -> {
+            worker.setHealthState(WorkerHealthState.DEAD);
+            workerRepository.save(worker);
+            log.info("Worker {} marked DEAD", workerId);
+        });
     }
 
     public void allocateResources(String workerId, ResourceProfile profile) {

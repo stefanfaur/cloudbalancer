@@ -45,7 +45,6 @@ cloudbalancer:
     artifact-max-size-bytes: ${ARTIFACT_MAX_SIZE_BYTES:104857600}
     scaling:
       enabled: true
-      runtime-mode: LOCAL
       evaluation-interval-ms: 30000
       cpu-high-threshold: 80.0
       cpu-low-threshold: 30.0
@@ -53,8 +52,14 @@ cloudbalancer:
       scale-down-window-seconds: 300
       queue-pressure-window-seconds: 120
       queue-pressure-ratio-threshold: 1.5
-      process-worker-jar-path: worker/build/libs/worker.jar
-      process-worker-kafka-bootstrap: localhost:9092
+      docker-worker-image: ${DOCKER_WORKER_IMAGE:docker-worker}
+      docker-network-name: docker_default
+      kafka-bootstrap-internal: kafka:29092
+      drain-time-seconds: 60
+      default-worker-executor-types: SIMULATED,DOCKER,SHELL
+      default-worker-cpu-cores: 4
+      default-worker-memory-mb: 8192
+      default-worker-disk-mb: 10240
   retry:
     scan-interval-ms: 5000
     base-delay-seconds: 5

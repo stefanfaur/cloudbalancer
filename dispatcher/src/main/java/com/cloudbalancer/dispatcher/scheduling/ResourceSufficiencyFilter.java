@@ -11,6 +11,9 @@ public class ResourceSufficiencyFilter implements WorkerFilter {
     @Override
     public List<WorkerRecord> filter(TaskRecord task, List<WorkerRecord> candidates) {
         ResourceProfile required = task.getDescriptor().resourceProfile();
+        if (required == null) {
+            return candidates;
+        }
         return candidates.stream()
             .filter(w -> hasAvailableResources(w, required))
             .toList();
@@ -18,6 +21,9 @@ public class ResourceSufficiencyFilter implements WorkerFilter {
 
     private boolean hasAvailableResources(WorkerRecord worker, ResourceProfile required) {
         var total = worker.getCapabilities().totalResources();
+        if (total == null) {
+            return false;
+        }
         int freeCpu = total.cpuCores() - worker.getAllocatedCpu();
         int freeMemory = total.memoryMB() - worker.getAllocatedMemoryMb();
         int freeDisk = total.diskMB() - worker.getAllocatedDiskMb();

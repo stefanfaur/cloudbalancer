@@ -11,6 +11,9 @@ public class ConstraintFilter implements WorkerFilter {
     @Override
     public List<WorkerRecord> filter(TaskRecord task, List<WorkerRecord> candidates) {
         TaskConstraints constraints = task.getDescriptor().constraints();
+        if (constraints == null) {
+            return candidates;
+        }
         return candidates.stream()
             .filter(w -> matchesConstraints(w, constraints))
             .toList();
@@ -19,7 +22,8 @@ public class ConstraintFilter implements WorkerFilter {
     private boolean matchesConstraints(WorkerRecord worker, TaskConstraints constraints) {
         // Required tags: worker must have all
         if (constraints.requiredTags() != null && !constraints.requiredTags().isEmpty()) {
-            if (!worker.getCapabilities().tags().containsAll(constraints.requiredTags())) {
+            var tags = worker.getCapabilities().tags();
+            if (tags == null || !tags.containsAll(constraints.requiredTags())) {
                 return false;
             }
         }
