@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: cloudbalancer-worker-agent
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: agent-${cloudbalancer.agent.id:agent-1}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+cloudbalancer:
+  agent:
+    id: ${AGENT_ID:agent-1}
+    hostname: ${HOSTNAME:localhost}
+    total-cpu-cores: ${AGENT_CPU_CORES:8}
+    total-memory-mb: ${AGENT_MEMORY_MB:16384}
+    supported-executors: SIMULATED,SHELL,PYTHON,DOCKER
+    heartbeat-interval-ms: 10000
+    registration-token: ${AGENT_REGISTRATION_TOKEN:}
+    dispatcher-url: ${DISPATCHER_URL:http://dispatcher:8080}
+    docker:
+      host: unix:///var/run/docker.sock
+      worker-image: ${DOCKER_WORKER_IMAGE:docker-worker}
+      network-name: ${DOCKER_NETWORK_NAME:docker_default}
+      kafka-bootstrap-internal: ${KAFKA_BOOTSTRAP_SERVERS:kafka:29092}

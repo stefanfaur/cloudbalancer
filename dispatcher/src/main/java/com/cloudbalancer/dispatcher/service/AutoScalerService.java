@@ -6,6 +6,7 @@ import com.cloudbalancer.common.model.TaskState;
 import com.cloudbalancer.common.runtime.NodeRuntime;
 import com.cloudbalancer.common.runtime.WorkerConfig;
 import com.cloudbalancer.dispatcher.config.ScalingProperties;
+import com.cloudbalancer.dispatcher.scaling.AgentRuntime;
 import com.cloudbalancer.dispatcher.kafka.EventPublisher;
 import com.cloudbalancer.dispatcher.persistence.TaskRepository;
 import org.slf4j.Logger;
@@ -121,6 +122,9 @@ public class AutoScalerService {
         var allWorkers = workerRegistry.getAllWorkers();
         var availableWorkers = workerRegistry.getAvailableWorkers();
         int currentCount = availableWorkers.size();
+        if (nodeRuntime instanceof AgentRuntime agentRuntime) {
+            currentCount += agentRuntime.getPendingWorkerCount();
+        }
 
         // Check cooldown
         long cooldownRemaining = Duration.between(lastScalingAction, now).compareTo(policy.cooldownPeriod()) < 0

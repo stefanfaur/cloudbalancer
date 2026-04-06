@@ -1,0 +1,14 @@
+# Remote Agent Deployment
+# Deploy on any machine with Docker installed.
+# Prerequisites: docker login git.faur.sh
+# Usage: cp agent.env.example .env && vi .env && docker compose -f docker-compose.agent.yml up -d
+
+services:
+  agent:
+    image: git.faur.sh/stefanfaur/cloudbalancer-agent:latest
+    container_name: cloudbalancer-agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

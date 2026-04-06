@@ -44,6 +44,7 @@ cloudbalancer:
     artifact-base-path: ${ARTIFACT_BASE_PATH:artifacts}
     artifact-max-size-bytes: ${ARTIFACT_MAX_SIZE_BYTES:104857600}
     scaling:
+      runtime-mode: ${SCALING_RUNTIME_MODE:DOCKER}
       enabled: true
       evaluation-interval-ms: 30000
       cpu-high-threshold: 80.0
@@ -60,6 +61,10 @@ cloudbalancer:
       default-worker-cpu-cores: 4
       default-worker-memory-mb: 8192
       default-worker-disk-mb: 10240
+  registration:
+    kafka-bootstrap-external: ${KAFKA_EXTERNAL_BOOTSTRAP:localhost:9092}
+    kafka-username: ${KAFKA_AGENT_USERNAME:cloudbalancer-agent}
+    kafka-password: ${KAFKA_AGENT_PASSWORD:changeme}
   retry:
     scan-interval-ms: 5000
     base-delay-seconds: 5

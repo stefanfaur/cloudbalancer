@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "cloudbalancer.dispatcher.scaling")
 public class ScalingProperties {
+    private String runtimeMode = "DOCKER";
     private boolean enabled = true;
     private long evaluationIntervalMs = 30000;
     private double cpuHighThreshold = 80.0;
@@ -27,6 +28,8 @@ public class ScalingProperties {
     private int defaultWorkerMemoryMb = 8192;
     private int defaultWorkerDiskMb = 10240;
 
+    public String getRuntimeMode() { return runtimeMode; }
+    public void setRuntimeMode(String runtimeMode) { this.runtimeMode = runtimeMode; }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public long getEvaluationIntervalMs() { return evaluationIntervalMs; }
