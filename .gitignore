@@ -35,3 +35,6 @@ Thumbs.db
 docs/.claude_worktrees_*
 wiki/docs/
 .wiki-build/
+
+# Claude Code worktrees
+.claude/worktrees/
