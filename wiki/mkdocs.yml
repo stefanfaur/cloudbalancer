@@ -1,0 +1,39 @@
+site_name: CloudBalancer Wiki
+site_description: Architecture documentation for the CloudBalancer distributed task execution system
+docs_dir: docs
+site_dir: ../.wiki-build
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: deep orange
+    accent: deep orange
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+
+plugins:
+  - search
+  - awesome-pages
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true

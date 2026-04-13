@@ -30,3 +30,8 @@ Thumbs.db
 
 # Brainstorm visual companion
 .superpowers/
+
+# Wiki build artifacts
+docs/.claude_worktrees_*
+wiki/docs/
+.wiki-build/

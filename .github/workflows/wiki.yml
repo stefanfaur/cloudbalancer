@@ -1,0 +1,41 @@
+name: Build and deploy wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "wiki/**"
+      - "scripts/build_wiki.py"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: wiki-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r wiki/requirements.txt
+      - name: Normalize docs
+        run: python scripts/build_wiki.py
+      - name: Build site
+        run: mkdocs build -f wiki/mkdocs.yml
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .wiki-build
+          publish_branch: gh-pages
+          force_orphan: true
