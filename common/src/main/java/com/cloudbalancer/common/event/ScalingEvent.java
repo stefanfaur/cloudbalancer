@@ -14,7 +14,8 @@ public record ScalingEvent(
     int previousWorkerCount,
     int newWorkerCount,
     List<String> workersAdded,
-    List<String> workersRemoved
+    List<String> workersRemoved,
+    String agentId
 ) implements CloudBalancerEvent {
     @Override
     public String eventType() { return "SCALING_DECISION"; }

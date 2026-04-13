@@ -47,10 +47,11 @@ export function useWebSocket() {
           scheduleInvalidation("worker-snapshots", "cluster-metrics")
           break
         case "WORKER_STATE":
-          scheduleInvalidation("worker-snapshots")
+          scheduleInvalidation("worker-snapshots", "agents")
           break
         case "SCALING_EVENT":
-          scheduleInvalidation("scaling-status")
+          scheduleInvalidation("scaling-status", "agents")
+          window.dispatchEvent(new CustomEvent("scaling-event", { detail: msg.payload }))
           break
         case "ALERT":
           addAlert(msg.payload)

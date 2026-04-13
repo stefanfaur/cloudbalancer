@@ -149,7 +149,7 @@ public class AutoScalerService {
                 scaleUp(toAdd, ScalingTriggerType.REACTIVE,
                     String.format("Avg CPU %.1f%% > %.1f%% threshold for %ds window",
                         avgCpu, props.getCpuHighThreshold(), props.getReactiveWindowSeconds()),
-                    currentCount, policy);
+                    currentCount, policy, null);
                 return;
             }
         }
@@ -170,7 +170,7 @@ public class AutoScalerService {
                             String.format("Queue pressure ratio %.2f >= %.2f threshold over %ds window",
                                 pressureRatio, props.getQueuePressureRatioThreshold(),
                                 props.getQueuePressureWindowSeconds()),
-                            currentCount, policy);
+                            currentCount, policy, null);
                         return;
                     }
                 }
@@ -181,7 +181,7 @@ public class AutoScalerService {
                     scaleUp(toAdd, ScalingTriggerType.QUEUE_PRESSURE,
                         String.format("Queue pressure: %d submitted, 0 completed over %ds window",
                             submittedDelta, props.getQueuePressureWindowSeconds()),
-                        currentCount, policy);
+                        currentCount, policy, null);
                     return;
                 }
             }
@@ -199,13 +199,13 @@ public class AutoScalerService {
                 if (toRemove > 0) {
                     scaleDown(toRemove, availableWorkers,
                         String.format("Avg CPU %.1f%% < %.1f%% for %ds, queue empty",
-                            avgCpu, props.getCpuLowThreshold(), props.getScaleDownWindowSeconds()));
+                            avgCpu, props.getCpuLowThreshold(), props.getScaleDownWindowSeconds()), null);
                 }
             }
         }
     }
 
-    public ScalingDecision triggerManual(ScalingAction action, int count) {
+    public ScalingDecision triggerManual(ScalingAction action, int count, String agentId) {
         var policy = policyService.getCurrentPolicy();
         var available = workerRegistry.getAvailableWorkers();
         int currentCount = available.size();
@@ -213,12 +213,12 @@ public class AutoScalerService {
         if (action == ScalingAction.SCALE_UP) {
             int toAdd = Math.min(count, policy.maxWorkers() - currentCount);
             if (toAdd > 0) {
-                return scaleUp(toAdd, ScalingTriggerType.MANUAL, "Manual trigger", currentCount, policy);
+                return scaleUp(toAdd, ScalingTriggerType.MANUAL, "Manual trigger", currentCount, policy, agentId);
             }
         } else if (action == ScalingAction.SCALE_DOWN) {
             int toRemove = Math.min(count, currentCount - policy.minWorkers());
             if (toRemove > 0) {
-                return scaleDown(toRemove, available, "Manual trigger");
+                return scaleDown(toRemove, available, "Manual trigger", agentId);
             }
         }
 
@@ -257,7 +257,7 @@ public class AutoScalerService {
     }
 
     private ScalingDecision scaleUp(int count, ScalingTriggerType triggerType, String reason,
-                                     int currentCount, ScalingPolicy policy) {
+                                     int currentCount, ScalingPolicy policy, String agentId) {
         List<String> added = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             String workerId = "auto-docker-" + autoWorkerCounter.incrementAndGet();
@@ -279,14 +279,14 @@ public class AutoScalerService {
 
         var event = new ScalingEvent(UUID.randomUUID().toString(), Instant.now(),
             ScalingAction.SCALE_UP, triggerType, reason,
-            currentCount, newCount, added, List.of());
+            currentCount, newCount, added, List.of(), agentId);
         eventPublisher.publishEvent("system.scaling", "scaling", event);
 
         log.info("Scale-up complete: {} -> {} workers ({})", currentCount, newCount, reason);
         return decision;
     }
 
-    private ScalingDecision scaleDown(int count, List<?> availableWorkers, String reason) {
+    private ScalingDecision scaleDown(int count, List<?> availableWorkers, String reason, String agentId) {
         int currentCount = availableWorkers.size();
         List<String> removed = new ArrayList<>();
 
@@ -313,7 +313,7 @@ public class AutoScalerService {
 
         var event = new ScalingEvent(UUID.randomUUID().toString(), Instant.now(),
             ScalingAction.SCALE_DOWN, ScalingTriggerType.REACTIVE, reason,
-            currentCount, newCount, List.of(), removed);
+            currentCount, newCount, List.of(), removed, agentId);
         eventPublisher.publishEvent("system.scaling", "scaling", event);
 
         log.info("Scale-down complete: {} -> {} workers ({})", currentCount, newCount, reason);

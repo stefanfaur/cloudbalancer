@@ -152,7 +152,7 @@ class AutoScalerServiceTest {
         );
         when(workerRegistry.getAvailableWorkers()).thenReturn(workers);
 
-        autoScaler.triggerManual(ScalingAction.SCALE_DOWN, 1);
+        autoScaler.triggerManual(ScalingAction.SCALE_DOWN, 1, null);
 
         verify(workerRegistry).drainWorker(anyString());
         verify(nodeRuntime).drainAndStop(anyString(), eq(60));

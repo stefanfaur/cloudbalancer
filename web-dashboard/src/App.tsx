@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { AuthProvider, useAuth } from "@/hooks/use-auth"
 import { AlertsProvider } from "@/hooks/use-alerts"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Toaster } from "@/components/ui/sonner"
 
 // Eager: login and layout (always needed)
 import LoginPage from "@/pages/login"
@@ -17,6 +18,7 @@ const TaskSubmit = lazy(() => import("@/pages/tasks/task-submit"))
 const TaskTemplates = lazy(() => import("@/pages/tasks/task-templates"))
 const WorkerList = lazy(() => import("@/pages/workers/worker-list"))
 const WorkerDetail = lazy(() => import("@/pages/workers/worker-detail"))
+const Agents = lazy(() => import("@/pages/agents"))
 const Analytics = lazy(() => import("@/pages/analytics"))
 const SettingsPage = lazy(() => import("@/pages/settings"))
 
@@ -78,6 +80,7 @@ function AppRoutes() {
         <Route path="/tasks/templates" element={<TaskTemplates />} />
         <Route path="/workers" element={<WorkerList />} />
         <Route path="/workers/:id" element={<WorkerDetail />} />
+        <Route path="/agents" element={<Agents />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
@@ -95,6 +98,7 @@ function App() {
             <Suspense fallback={<LoadingFallback />}>
               <AppRoutes />
             </Suspense>
+            <Toaster />
           </AlertsProvider>
         </AuthProvider>
       </BrowserRouter>

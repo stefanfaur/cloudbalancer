@@ -102,7 +102,7 @@ class AutoScalingLifecycleTest {
         registerWorker("w1");
         registerWorker("w2");
 
-        var decision = autoScaler.triggerManual(ScalingAction.SCALE_UP, 1);
+        var decision = autoScaler.triggerManual(ScalingAction.SCALE_UP, 1, null);
 
         assertThat(decision.action()).isEqualTo(ScalingAction.SCALE_UP);
         assertThat(decision.triggerType()).isEqualTo(ScalingTriggerType.MANUAL);
@@ -149,7 +149,7 @@ class AutoScalingLifecycleTest {
         registerWorker("w2");
         registerWorker("w3");
 
-        var decision = autoScaler.triggerManual(ScalingAction.SCALE_UP, 2);
+        var decision = autoScaler.triggerManual(ScalingAction.SCALE_UP, 2, null);
 
         assertThat(decision.action()).isEqualTo(ScalingAction.NONE);
         assertThat(decision.reason()).contains("bounds");
@@ -161,7 +161,7 @@ class AutoScalingLifecycleTest {
         registerWorker("w2");
 
         // Trigger manual scale-up
-        autoScaler.triggerManual(ScalingAction.SCALE_UP, 1);
+        autoScaler.triggerManual(ScalingAction.SCALE_UP, 1, null);
 
         // Consume from system.scaling topic
         await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {

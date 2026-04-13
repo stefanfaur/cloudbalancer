@@ -108,7 +108,7 @@ class EventSerializationTest {
             UUID.randomUUID().toString(), Instant.now(),
             ScalingAction.SCALE_UP, ScalingTriggerType.REACTIVE,
             "CPU > 80% for 2 min", 3, 4,
-            List.of("auto-local-4"), List.of()
+            List.of("auto-local-4"), List.of(), null
         );
 
         String json = mapper.writeValueAsString(event);

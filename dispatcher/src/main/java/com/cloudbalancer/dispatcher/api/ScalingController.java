@@ -77,7 +77,7 @@ public class ScalingController {
             return ResponseEntity.badRequest().build();
         }
 
-        autoScaler.triggerManual(action, request.count());
+        autoScaler.triggerManual(action, request.count(), request.agentId());
 
         return ResponseEntity.ok(getStatus());
     }

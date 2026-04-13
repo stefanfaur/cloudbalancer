@@ -166,13 +166,27 @@ export interface LoginRequest {
   password: string
 }
 
+// Scaling event payload (from Kafka via WebSocket)
+export interface ScalingEventPayload {
+  eventId: string
+  timestamp: string
+  action: ScalingAction
+  triggerType: string
+  reason: string
+  previousWorkerCount: number
+  newWorkerCount: number
+  workersAdded: string[]
+  workersRemoved: string[]
+  agentId: string | null
+}
+
 // WebSocket message types
 export type WsMessage =
   | { type: "INITIAL_SNAPSHOT"; payload: { workers: Array<{ workerId: string; healthState: WorkerHealthState; activeTaskCount: number }>; activeTaskCount: number; queuedTaskCount: number } }
   | { type: "TASK_UPDATE"; payload: TaskEnvelope }
   | { type: "WORKER_UPDATE"; payload: WorkerMetricsSnapshot }
   | { type: "WORKER_STATE"; payload: { workerId: string; state: WorkerHealthState } }
-  | { type: "SCALING_EVENT"; payload: ScalingDecision }
+  | { type: "SCALING_EVENT"; payload: ScalingEventPayload }
   | { type: "ALERT"; payload: { severity: string; message: string; timestamp: string } }
 
 // Strategy types
