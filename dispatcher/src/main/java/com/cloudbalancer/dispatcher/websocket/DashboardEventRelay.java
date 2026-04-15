@@ -1,5 +1,6 @@
 package com.cloudbalancer.dispatcher.websocket;
 
+import com.cloudbalancer.common.agent.AgentEvent;
 import com.cloudbalancer.common.event.*;
 import com.cloudbalancer.common.model.TaskEnvelope;
 import com.cloudbalancer.common.model.TaskResult;
@@ -93,6 +94,57 @@ public class DashboardEventRelay {
             handler.broadcast("SCALING_EVENT", event);
         } catch (Exception e) {
             log.warn("Failed to process scaling event for dashboard: {}", e.getMessage());
+        }
+    }
+
+    @KafkaListener(topics = "agents.events", groupId = "dashboard-relay")
+    public void onAgentEvent(String message) {
+        try {
+            AgentEvent event = JsonUtil.mapper().readValue(message, AgentEvent.class);
+            switch (event) {
+                case AgentEvent.ContainerCreatingEvent creating ->
+                    handler.broadcast("CONTAINER_STARTING", Map.of(
+                        "agentId", creating.agentId(),
+                        "workerId", creating.workerId(),
+                        "timestamp", creating.timestamp().toString()));
+                case AgentEvent.WorkerStartedEvent started ->
+                    handler.broadcast("CONTAINER_STARTED", Map.of(
+                        "agentId", started.agentId(),
+                        "workerId", started.workerId(),
+                        "containerId", started.containerId(),
+                        "timestamp", started.timestamp().toString()));
+                case AgentEvent.WorkerStartFailedEvent failed ->
+                    handler.broadcast("CONTAINER_FAILED", Map.of(
+                        "agentId", failed.agentId(),
+                        "workerId", failed.workerId(),
+                        "error", failed.reason(),
+                        "timestamp", failed.timestamp().toString()));
+                case AgentEvent.WorkerStoppedEvent stopped ->
+                    handler.broadcast("WORKER_STOPPED", Map.of(
+                        "agentId", stopped.agentId(),
+                        "workerId", stopped.workerId(),
+                        "timestamp", stopped.timestamp().toString()));
+                case AgentEvent.WorkerStopFailedEvent stopFailed ->
+                    handler.broadcast("WORKER_STOP_FAILED", Map.of(
+                        "agentId", stopFailed.agentId(),
+                        "workerId", stopFailed.workerId(),
+                        "error", stopFailed.reason(),
+                        "timestamp", stopFailed.timestamp().toString()));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to process agent event for dashboard: {}", e.getMessage());
+        }
+    }
+
+    @KafkaListener(topics = "workers.registration", groupId = "dashboard-relay")
+    public void onWorkerRegistered(String message) {
+        try {
+            WorkerRegisteredEvent event = JsonUtil.mapper().readValue(message, WorkerRegisteredEvent.class);
+            handler.broadcast("WORKER_REGISTERED", Map.of(
+                "workerId", event.workerId(),
+                "timestamp", event.timestamp().toString()));
+        } catch (Exception e) {
+            log.warn("Failed to process worker registration for dashboard: {}", e.getMessage());
         }
     }
 }

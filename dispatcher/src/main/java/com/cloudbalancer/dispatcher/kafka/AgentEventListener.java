@@ -54,6 +54,7 @@ public class AgentEventListener {
             var event = JsonUtil.mapper().readValue(message, AgentEvent.class);
 
             switch (event) {
+                case AgentEvent.ContainerCreatingEvent creating -> handleContainerCreating(creating);
                 case AgentEvent.WorkerStartedEvent started -> handleWorkerStarted(started);
                 case AgentEvent.WorkerStartFailedEvent failed -> handleWorkerStartFailed(failed);
                 case AgentEvent.WorkerStoppedEvent stopped -> handleWorkerStopped(stopped);
@@ -72,6 +73,10 @@ public class AgentEventListener {
         } catch (Exception e) {
             log.error("Failed to process agent registration", e);
         }
+    }
+
+    private void handleContainerCreating(AgentEvent.ContainerCreatingEvent event) {
+        log.debug("Container creating for worker {} on agent {}", event.workerId(), event.agentId());
     }
 
     private void handleWorkerStarted(AgentEvent.WorkerStartedEvent event) {
