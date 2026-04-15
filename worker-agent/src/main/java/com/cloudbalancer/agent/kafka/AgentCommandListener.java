@@ -56,6 +56,10 @@ public class AgentCommandListener {
     }
 
     private void handleStart(AgentCommand.StartWorkerCommand cmd) {
+        // Publish ContainerCreatingEvent before Docker operation
+        publishEvent(new AgentEvent.ContainerCreatingEvent(
+            props.getId(), cmd.workerId(), Instant.now()));
+
         try {
             String containerId = containerManager.startWorker(
                 cmd.workerId(), cmd.cpuCores(), cmd.memoryMB(),

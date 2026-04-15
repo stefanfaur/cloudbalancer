@@ -49,11 +49,15 @@ class AgentCommandListenerTest {
         verify(containerManager).startWorker(eq("worker-5"), eq(4), eq(8192), any());
 
         var valueCaptor = ArgumentCaptor.forClass(String.class);
-        verify(kafkaTemplate).send(eq("agents.events"), eq("agent-1"), valueCaptor.capture());
+        verify(kafkaTemplate, times(2)).send(eq("agents.events"), eq("agent-1"), valueCaptor.capture());
 
-        var event = JsonUtil.mapper().readValue(valueCaptor.getValue(), AgentEvent.class);
-        assertThat(event).isInstanceOf(AgentEvent.WorkerStartedEvent.class);
-        assertThat(((AgentEvent.WorkerStartedEvent) event).containerId()).isEqualTo("container-abc");
+        var events = valueCaptor.getAllValues();
+        var containerCreatingEvent = JsonUtil.mapper().readValue(events.get(0), AgentEvent.class);
+        assertThat(containerCreatingEvent).isInstanceOf(AgentEvent.ContainerCreatingEvent.class);
+
+        var startedEvent = JsonUtil.mapper().readValue(events.get(1), AgentEvent.class);
+        assertThat(startedEvent).isInstanceOf(AgentEvent.WorkerStartedEvent.class);
+        assertThat(((AgentEvent.WorkerStartedEvent) startedEvent).containerId()).isEqualTo("container-abc");
     }
 
     @Test
@@ -68,11 +72,15 @@ class AgentCommandListenerTest {
         listener.onCommand(JsonUtil.mapper().writeValueAsString(cmd));
 
         var valueCaptor = ArgumentCaptor.forClass(String.class);
-        verify(kafkaTemplate).send(eq("agents.events"), eq("agent-1"), valueCaptor.capture());
+        verify(kafkaTemplate, times(2)).send(eq("agents.events"), eq("agent-1"), valueCaptor.capture());
 
-        var event = JsonUtil.mapper().readValue(valueCaptor.getValue(), AgentEvent.class);
-        assertThat(event).isInstanceOf(AgentEvent.WorkerStartFailedEvent.class);
-        assertThat(((AgentEvent.WorkerStartFailedEvent) event).reason()).contains("image not found");
+        var events = valueCaptor.getAllValues();
+        var containerCreatingEvent = JsonUtil.mapper().readValue(events.get(0), AgentEvent.class);
+        assertThat(containerCreatingEvent).isInstanceOf(AgentEvent.ContainerCreatingEvent.class);
+
+        var failedEvent = JsonUtil.mapper().readValue(events.get(1), AgentEvent.class);
+        assertThat(failedEvent).isInstanceOf(AgentEvent.WorkerStartFailedEvent.class);
+        assertThat(((AgentEvent.WorkerStartFailedEvent) failedEvent).reason()).contains("image not found");
     }
 
     @Test
