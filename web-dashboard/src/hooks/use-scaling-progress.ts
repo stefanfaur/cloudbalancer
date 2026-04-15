@@ -88,12 +88,27 @@ export function useScalingProgress(isReconnecting = false): ScalingProgressState
   useEffect(() => {
     function onScalingProgress(e: Event) {
       const event = (e as CustomEvent<any>).detail
-      const opKey = `${event.agentId}-${event.workerId}`
       const now = Date.now()
 
       setOperations((prev) => {
         const next = new Map(prev)
-        let op = next.get(opKey)
+
+        // Helper: find operation by workerId and direction (for events without agentId)
+        function findAndUpdateOp(workerId: string, direction: "up" | "down",
+            updates: Partial<ScalingOperation>) {
+          for (const [key, op] of next) {
+            if (op.workerId === workerId && op.direction === direction) {
+              const updated = { ...op, ...updates }
+              next.set(key, updated)
+              return updated
+            }
+          }
+          return undefined
+        }
+
+        // Build key - events with agentId use agentId-workerId
+        const opKey = event.agentId ? `${event.agentId}-${event.workerId}` : null
+        let op = opKey ? next.get(opKey) : undefined
 
         switch (event.type) {
           // Scale-up: create operation
@@ -117,33 +132,39 @@ export function useScalingProgress(isReconnecting = false): ScalingProgressState
             if (op) {
               op = { ...op, currentStep: "container_starting" }
               op.stepTimestamps = { ...op.stepTimestamps, container_starting: now }
-              next.set(opKey, op)
+              next.set(opKey!, op)
             }
             break
           }
 
-          // Scale-up: worker registered
+          // Scale-up: worker registered (no agentId - find by workerId)
           case "WORKER_REGISTERED": {
-            if (op && op.direction === "up") {
-              op = { ...op, currentStep: "registered" }
-              op.stepTimestamps = { ...op.stepTimestamps, registered: now }
-              next.set(opKey, op)
-            }
+            findAndUpdateOp(event.workerId, "up", {
+              currentStep: "registered",
+              stepTimestamps: { ...op?.stepTimestamps, registered: now },
+            } as Partial<ScalingOperation>)
             break
           }
 
-          // Scale-up: worker ready (healthy state)
+          // Scale-up: worker ready (healthy state) / Scale-down: draining (no agentId)
           case "WORKER_STATE": {
-            if (op && event.state === "HEALTHY" && op.direction === "up") {
-              op = { ...op, currentStep: "ready", completedAt: now }
-              op.stepTimestamps = { ...op.stepTimestamps, ready: now }
-              next.set(opKey, op)
-              // Schedule cleanup after completion
-              scheduleCleanup(opKey, CLEANUP_DELAY_MS)
-            } else if (op && event.state === "DRAINING" && op.direction === "down") {
-              op = { ...op, currentStep: "draining" }
-              op.stepTimestamps = { ...op.stepTimestamps, draining: now }
-              next.set(opKey, op)
+            if (event.state === "HEALTHY") {
+              // Scale-up: find by workerId direction=up
+              const found = findAndUpdateOp(event.workerId, "up", {
+                currentStep: "ready",
+                completedAt: now,
+                stepTimestamps: { ...op?.stepTimestamps, ready: now },
+              } as Partial<ScalingOperation>)
+              if (found) {
+                const foundKey = `${found.agentId}-${found.workerId}`
+                scheduleCleanup(foundKey, CLEANUP_DELAY_MS)
+              }
+            } else if (event.state === "DRAINING") {
+              // Scale-down: find by workerId direction=down
+              findAndUpdateOp(event.workerId, "down", {
+                currentStep: "draining",
+                stepTimestamps: { ...op?.stepTimestamps, draining: now },
+              } as Partial<ScalingOperation>)
             }
             break
           }
@@ -153,9 +174,8 @@ export function useScalingProgress(isReconnecting = false): ScalingProgressState
             if (op && op.direction === "down") {
               op = { ...op, currentStep: "stopped", completedAt: now }
               op.stepTimestamps = { ...op.stepTimestamps, stopped: now }
-              next.set(opKey, op)
-              // Schedule cleanup after completion
-              scheduleCleanup(opKey, CLEANUP_DELAY_MS)
+              next.set(opKey!, op)
+              scheduleCleanup(opKey!, CLEANUP_DELAY_MS)
             }
             break
           }
@@ -167,8 +187,8 @@ export function useScalingProgress(isReconnecting = false): ScalingProgressState
                 ...op,
                 failed: { error: event.error, timestamp: event.timestamp },
               }
-              next.set(opKey, op)
-              scheduleCleanup(opKey, FAILED_CLEANUP_DELAY_MS)
+              next.set(opKey!, op)
+              scheduleCleanup(opKey!, FAILED_CLEANUP_DELAY_MS)
             }
             break
           }
@@ -179,8 +199,8 @@ export function useScalingProgress(isReconnecting = false): ScalingProgressState
                 ...op,
                 failed: { error: event.error, timestamp: event.timestamp },
               }
-              next.set(opKey, op)
-              scheduleCleanup(opKey, FAILED_CLEANUP_DELAY_MS)
+              next.set(opKey!, op)
+              scheduleCleanup(opKey!, FAILED_CLEANUP_DELAY_MS)
             }
             break
           }
