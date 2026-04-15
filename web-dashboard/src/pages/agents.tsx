@@ -1,7 +1,7 @@
 import { useAgents, type AgentInfoResponse } from "@/api/agents"
 import { useTriggerScaling } from "@/api/scaling"
 import { ErrorCard } from "@/components/error-card"
-import { ScalingActivityLog } from "@/components/scaling-activity-log"
+import { ScalingStepper } from "@/components/scaling-stepper"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,9 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Cpu, ChevronUp, ChevronDown, Loader2 } from "lucide-react"
+import { Cpu, ChevronUp, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
-import { useScalingActivity, type ScalingActivityState } from "@/hooks/use-scaling-activity"
+import { useScalingProgress } from "@/hooks/use-scaling-progress"
 
 function timeAgo(iso: string | null) {
   if (!iso) return "—"
@@ -43,27 +43,20 @@ function CapacityBar({ used, total, label, unit }: { used: number; total: number
 
 interface AgentRowProps {
   agent: AgentInfoResponse
-  activity: ScalingActivityState
 }
 
-function AgentRow({ agent, activity }: AgentRowProps) {
+function AgentRow({ agent }: AgentRowProps) {
   const trigger = useTriggerScaling()
-  const pending = activity.isAgentPending(agent.agentId)
-  const pendingAction = activity.getPendingAction(agent.agentId)
 
   const cpuUsed = agent.totalCpuCores - agent.availableCpuCores
   const memUsed = agent.totalMemoryMB - agent.availableMemoryMB
 
   function handleScale(action: "SCALE_UP" | "SCALE_DOWN") {
-    activity.addPendingAction(agent.agentId, action)
     trigger.mutate(
       { action, count: 1, agentId: agent.agentId },
       {
         onSuccess: () => toast.success("Scale command sent"),
-        onError: (e) => {
-          activity.clearPendingAction(agent.agentId)
-          toast.error("Scale failed", { description: e.message })
-        },
+        onError: (e) => toast.error("Scale failed", { description: e.message }),
       },
     )
   }
@@ -88,33 +81,26 @@ function AgentRow({ agent, activity }: AgentRowProps) {
         {timeAgo(agent.lastHeartbeat)}
       </TableCell>
       <TableCell>
-        {pending ? (
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>{pendingAction?.action === "SCALE_UP" ? "Scaling up…" : "Scaling down…"}</span>
-          </div>
-        ) : (
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950"
-              onClick={() => handleScale("SCALE_UP")}
-            >
-              <ChevronUp className="h-3 w-3 mr-1" />
-              Scale Up
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-950"
-              onClick={() => handleScale("SCALE_DOWN")}
-            >
-              <ChevronDown className="h-3 w-3 mr-1" />
-              Scale Down
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950"
+            onClick={() => handleScale("SCALE_UP")}
+          >
+            <ChevronUp className="h-3 w-3 mr-1" />
+            Scale Up
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-950"
+            onClick={() => handleScale("SCALE_DOWN")}
+          >
+            <ChevronDown className="h-3 w-3 mr-1" />
+            Scale Down
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   )
@@ -122,7 +108,7 @@ function AgentRow({ agent, activity }: AgentRowProps) {
 
 export default function AgentList() {
   const { data: agents, isLoading, isError, error, refetch } = useAgents()
-  const activity = useScalingActivity()
+  const progress = useScalingProgress()
 
   return (
     <div className="space-y-4">
@@ -155,13 +141,20 @@ export default function AgentList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {agents?.map((a) => <AgentRow key={a.agentId} agent={a} activity={activity} />)}
+              {agents?.map((a) => (
+                <>
+                  <AgentRow key={a.agentId} agent={a} />
+                  <TableRow className="border-slate-700/50 bg-slate-950/20">
+                    <TableCell colSpan={8}>
+                      <ScalingStepper operations={progress.getOperationsForAgent(a.agentId)} />
+                    </TableCell>
+                  </TableRow>
+                </>
+              ))}
             </TableBody>
           </Table>
         </div>
       )}
-
-      <ScalingActivityLog events={activity.events} />
     </div>
   )
 }
