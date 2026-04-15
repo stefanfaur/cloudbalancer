@@ -180,6 +180,46 @@ export interface ScalingEventPayload {
   agentId: string | null
 }
 
+// Scale-up progress payloads
+export interface ContainerStartingPayload {
+  agentId: string
+  workerId: string
+  timestamp: string
+}
+
+export interface ContainerStartedPayload {
+  agentId: string
+  workerId: string
+  containerId: string
+  timestamp: string
+}
+
+export interface ContainerFailedPayload {
+  agentId: string
+  workerId: string
+  error: string
+  timestamp: string
+}
+
+export interface WorkerRegisteredPayload {
+  workerId: string
+  timestamp: string
+}
+
+// Scale-down progress payloads
+export interface WorkerStoppedPayload {
+  agentId: string
+  workerId: string
+  timestamp: string
+}
+
+export interface WorkerStopFailedPayload {
+  agentId: string
+  workerId: string
+  error: string
+  timestamp: string
+}
+
 // WebSocket message types
 export type WsMessage =
   | { type: "INITIAL_SNAPSHOT"; payload: { workers: Array<{ workerId: string; healthState: WorkerHealthState; activeTaskCount: number }>; activeTaskCount: number; queuedTaskCount: number } }
@@ -188,6 +228,12 @@ export type WsMessage =
   | { type: "WORKER_STATE"; payload: { workerId: string; state: WorkerHealthState } }
   | { type: "SCALING_EVENT"; payload: ScalingEventPayload }
   | { type: "ALERT"; payload: { severity: string; message: string; timestamp: string } }
+  | { type: "CONTAINER_STARTING"; payload: ContainerStartingPayload }
+  | { type: "CONTAINER_STARTED"; payload: ContainerStartedPayload }
+  | { type: "CONTAINER_FAILED"; payload: ContainerFailedPayload }
+  | { type: "WORKER_REGISTERED"; payload: WorkerRegisteredPayload }
+  | { type: "WORKER_STOPPED"; payload: WorkerStoppedPayload }
+  | { type: "WORKER_STOP_FAILED"; payload: WorkerStopFailedPayload }
 
 // Strategy types
 export interface StrategyResponse {
