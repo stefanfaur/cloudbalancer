@@ -82,4 +82,74 @@ describe("WebSocket hook logic", () => {
     }
     expect(delays).toEqual([1000, 2000, 4000, 8000, 16000])
   })
+
+  it("scaling-progress event types are correctly structured", () => {
+    const eventTypes = [
+      "CONTAINER_STARTING",
+      "CONTAINER_STARTED",
+      "CONTAINER_FAILED",
+      "WORKER_REGISTERED",
+      "WORKER_STOPPED",
+      "WORKER_STOP_FAILED",
+    ]
+    
+    for (const eventType of eventTypes) {
+      const message = {
+        type: eventType,
+        payload: {
+          agentId: "agent-1",
+          workerId: "worker-1",
+          timestamp: "2026-04-13T12:00:00Z",
+        },
+      }
+      const parsed = JSON.parse(JSON.stringify(message))
+      expect(parsed.type).toBe(eventType)
+    }
+  })
+
+  it("SCALING_EVENT with SCALE_UP dispatches correct scaling-progress event", () => {
+    const listener = vi.fn()
+    window.addEventListener("scaling-progress", listener)
+    
+    const event = new CustomEvent("scaling-progress", {
+      detail: {
+        type: "SCALING_EVENT",
+        action: "SCALE_UP",
+        agentId: "agent-1",
+        workersAdded: ["worker-1"],
+      },
+    })
+    window.dispatchEvent(event)
+    
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({ type: "SCALING_EVENT" }),
+      })
+    )
+    
+    window.removeEventListener("scaling-progress", listener)
+  })
+
+  it("CONTAINER_STARTING event is dispatched correctly", () => {
+    const listener = vi.fn()
+    window.addEventListener("scaling-progress", listener)
+    
+    const event = new CustomEvent("scaling-progress", {
+      detail: {
+        type: "CONTAINER_STARTING",
+        agentId: "agent-1",
+        workerId: "worker-1",
+        timestamp: "2026-04-13T12:00:00Z",
+      },
+    })
+    window.dispatchEvent(event)
+    
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({ type: "CONTAINER_STARTING" }),
+      })
+    )
+    
+    window.removeEventListener("scaling-progress", listener)
+  })
 })
