@@ -48,13 +48,28 @@ export function useWebSocket() {
           break
         case "WORKER_STATE":
           scheduleInvalidation("worker-snapshots", "agents")
+          window.dispatchEvent(new CustomEvent("scaling-progress", {
+            detail: { type: "WORKER_STATE", ...msg.payload }
+          }))
           break
         case "SCALING_EVENT":
           scheduleInvalidation("scaling-status", "agents")
-          window.dispatchEvent(new CustomEvent("scaling-event", { detail: msg.payload }))
+          window.dispatchEvent(new CustomEvent("scaling-progress", {
+            detail: { type: "SCALING_EVENT", ...msg.payload }
+          }))
           break
         case "ALERT":
           addAlert(msg.payload)
+          break
+        case "CONTAINER_STARTING":
+        case "CONTAINER_STARTED":
+        case "CONTAINER_FAILED":
+        case "WORKER_REGISTERED":
+        case "WORKER_STOPPED":
+        case "WORKER_STOP_FAILED":
+          window.dispatchEvent(new CustomEvent("scaling-progress", {
+            detail: { type: msg.type, ...msg.payload }
+          }))
           break
         case "INITIAL_SNAPSHOT":
           scheduleInvalidation("worker-snapshots", "cluster-metrics", "tasks")
