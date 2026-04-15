@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom"
-import { useClusterMetrics, useWorkerSnapshots } from "@/api/workers"
+import { useClusterMetrics, useWorkerSnapshots, useWorkerList } from "@/api/workers"
 import { KpiCard } from "@/components/kpi-card"
 import { HealthBadge } from "@/components/health-badge"
 import { CpuGauge } from "@/components/cpu-gauge"
@@ -22,8 +22,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-import { useEffect, useRef, useState, memo } from "react"
-import type { WorkerHealthState } from "@/api/types"
+import { useEffect, useMemo, useRef, useState, memo } from "react"
+import type { WorkerHealthState, WorkerMetricsSnapshot } from "@/api/types"
 
 // Accumulate cluster metrics for time-series charts
 function useMetricsHistory(cpuPercent: number | undefined, throughput: number | undefined) {
@@ -129,18 +129,57 @@ function WorkerCardSkeleton() {
   )
 }
 
-// Derive worker health from metrics (backend doesn't send health in snapshots)
-function deriveHealth(w: { cpuUsagePercent: number; activeTaskCount: number }): WorkerHealthState {
-  if (w.cpuUsagePercent > 95) return "SUSPECT"
-  return "HEALTHY"
+interface MergedWorker {
+  id: string
+  healthState: WorkerHealthState
+  cpuUsagePercent: number | null
+  heapUsedMB: number | null
+  heapMaxMB: number | null
+  activeTaskCount: number
 }
 
 export default function ClusterOverview() {
   const cluster = useClusterMetrics()
-  const workers = useWorkerSnapshots()
+  const snapshots = useWorkerSnapshots()
+  const workerList = useWorkerList()
   const navigate = useNavigate()
 
-  const metricsHistory = useMetricsHistory(cluster.data?.avgCpuPercent, cluster.data?.throughputPerMinute)
+  // Merge dispatcher worker list (source of truth) with metrics snapshots
+  const metricsMap = useMemo(() => {
+    const m = new Map<string, WorkerMetricsSnapshot>()
+    if (snapshots.data) {
+      for (const s of snapshots.data) m.set(s.workerId, s)
+    }
+    return m
+  }, [snapshots.data])
+
+  const liveWorkers: MergedWorker[] = useMemo(() => {
+    if (!workerList.data) return []
+    return workerList.data
+      .filter((w) => w.healthState !== "DEAD")
+      .map((w) => {
+        const m = metricsMap.get(w.id)
+        return {
+          id: w.id,
+          healthState: w.healthState as WorkerHealthState,
+          cpuUsagePercent: m?.cpuUsagePercent ?? null,
+          heapUsedMB: m?.heapUsedMB ?? null,
+          heapMaxMB: m?.heapMaxMB ?? null,
+          activeTaskCount: w.activeTaskCount,
+        }
+      })
+  }, [workerList.data, metricsMap])
+
+  const totalWorkerCount = liveWorkers.length
+  const healthyCount = liveWorkers.filter(
+    (w) => w.healthState === "HEALTHY" || w.healthState === "RECOVERING",
+  ).length
+
+  // If no live workers, zero out stale metrics
+  const effectiveCpu = totalWorkerCount > 0 ? cluster.data?.avgCpuPercent : 0
+  const effectiveHeap = totalWorkerCount > 0 ? cluster.data?.totalHeapUsedMB : 0
+
+  const metricsHistory = useMetricsHistory(effectiveCpu, cluster.data?.throughputPerMinute)
 
   if (cluster.isError) return <ErrorCard error={cluster.error} onRetry={() => cluster.refetch()} />
 
@@ -150,20 +189,20 @@ export default function ClusterOverview() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {cluster.isLoading ? (
+        {cluster.isLoading || workerList.isLoading ? (
           Array.from({ length: 6 }).map((_, i) => <KpiSkeleton key={i} />)
         ) : cluster.data ? (
           <>
-            <KpiCard label="Total Workers" value={cluster.data.workerCount} icon={Server} />
+            <KpiCard label="Total Workers" value={totalWorkerCount} icon={Server} />
             <KpiCard label="Active Tasks" value={cluster.data.totalActiveTaskCount} icon={ListChecks} />
             <KpiCard
               label="Healthy Workers"
-              value={`${cluster.data.healthyWorkerCount}/${cluster.data.workerCount}`}
+              value={`${healthyCount}/${totalWorkerCount}`}
               icon={Server}
-              trend={cluster.data.healthyWorkerCount === cluster.data.workerCount ? "up" : "down"}
+              trend={totalWorkerCount > 0 && healthyCount === totalWorkerCount ? "up" : totalWorkerCount > 0 ? "down" : undefined}
             />
-            <KpiCard label="Cluster CPU" value={`${Math.round(cluster.data.avgCpuPercent)}%`} icon={Cpu} />
-            <KpiCard label="Heap Used" value={`${Math.round(cluster.data.totalHeapUsedMB)} MB`} icon={MemoryStick} />
+            <KpiCard label="Cluster CPU" value={`${Math.round(effectiveCpu ?? 0)}%`} icon={Cpu} />
+            <KpiCard label="Heap Used" value={`${Math.round(effectiveHeap ?? 0)} MB`} icon={MemoryStick} />
             <KpiCard label="Throughput" value={`${cluster.data.throughputPerMinute.toFixed(1)}/min`} icon={Gauge} />
           </>
         ) : null}
@@ -192,36 +231,40 @@ export default function ClusterOverview() {
       {/* Worker cards grid */}
       <div>
         <h2 className="text-sm font-medium text-slate-400 mb-3">Workers</h2>
-        {workers.isLoading ? (
+        {workerList.isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {Array.from({ length: 4 }).map((_, i) => <WorkerCardSkeleton key={i} />)}
           </div>
-        ) : workers.data && workers.data.length > 0 ? (
+        ) : liveWorkers.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {workers.data.map((w) => (
+            {liveWorkers.map((w) => (
               <Card
-                key={w.workerId}
+                key={w.id}
                 className="bg-slate-900 border-slate-700 cursor-pointer hover:border-slate-500 transition-colors"
-                onClick={() => navigate(`/workers/${w.workerId}`)}
+                onClick={() => navigate(`/workers/${w.id}`)}
               >
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs text-slate-300 truncate max-w-[140px]">
-                      {w.workerId}
+                      {w.id}
                     </span>
-                    <HealthBadge state={deriveHealth(w)} />
+                    <HealthBadge state={w.healthState} />
                   </div>
                   <div className="flex items-center gap-4">
-                    <CpuGauge percent={w.cpuUsagePercent} />
+                    <CpuGauge percent={w.cpuUsagePercent ?? 0} />
                     <div className="flex-1 space-y-1.5 text-xs">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Memory</span>
-                        <span className="font-mono">{Math.round(w.heapUsedMB)}/{w.heapMaxMB} MB</span>
+                        <span className="font-mono">
+                          {w.heapUsedMB != null && w.heapMaxMB != null
+                            ? `${Math.round(w.heapUsedMB)}/${w.heapMaxMB} MB`
+                            : "—"}
+                        </span>
                       </div>
                       <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-blue-500 rounded-full transition-all"
-                          style={{ width: `${Math.min((w.heapUsedMB / w.heapMaxMB) * 100, 100)}%` }}
+                          style={{ width: `${w.heapUsedMB != null && w.heapMaxMB ? Math.min((w.heapUsedMB / w.heapMaxMB) * 100, 100) : 0}%` }}
                         />
                       </div>
                       <div className="flex justify-between">

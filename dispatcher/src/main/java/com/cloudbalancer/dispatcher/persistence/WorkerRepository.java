@@ -8,4 +8,6 @@ import java.util.List;
 public interface WorkerRepository extends JpaRepository<WorkerRecord, String> {
 
     List<WorkerRecord> findByHealthState(WorkerHealthState state);
+
+    List<WorkerRecord> findByAgentId(String agentId);
 }

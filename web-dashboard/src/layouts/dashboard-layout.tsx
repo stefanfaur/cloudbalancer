@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Server,
+  Cpu,
   BarChart3,
   Settings,
   LogOut,
@@ -20,6 +21,10 @@ const NAV_ITEMS = [
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/workers", label: "Workers", icon: Server },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
+] as const
+
+const ADMIN_NAV_ITEMS = [
+  { to: "/agents", label: "Agents", icon: Cpu },
 ] as const
 
 export default function DashboardLayout() {
@@ -66,20 +71,39 @@ export default function DashboardLayout() {
             </NavLink>
           ))}
           {role === "ADMIN" && (
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                  isActive
-                    ? "bg-slate-800 text-slate-50"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50",
-                )
-              }
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              <span className="lg:hidden xl:inline">Settings</span>
-            </NavLink>
+            <>
+              {ADMIN_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                      isActive
+                        ? "bg-slate-800 text-slate-50"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50",
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="lg:hidden xl:inline">{label}</span>
+                </NavLink>
+              ))}
+              <NavLink
+                to="/settings"
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                    isActive
+                      ? "bg-slate-800 text-slate-50"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50",
+                  )
+                }
+              >
+                <Settings className="h-4 w-4 shrink-0" />
+                <span className="lg:hidden xl:inline">Settings</span>
+              </NavLink>
+            </>
           )}
         </nav>
 

@@ -43,6 +43,9 @@ public class WorkerRecord {
     @Column(name = "drain_started_at")
     private Instant drainStartedAt;
 
+    @Column(name = "agent_id")
+    private String agentId;
+
     protected WorkerRecord() {}
 
     public WorkerRecord(String id, WorkerHealthState healthState,
@@ -93,4 +96,6 @@ public class WorkerRecord {
     public void setRecoveryStartedAt(Instant recoveryStartedAt) { this.recoveryStartedAt = recoveryStartedAt; }
     public Instant getDrainStartedAt() { return drainStartedAt; }
     public void setDrainStartedAt(Instant drainStartedAt) { this.drainStartedAt = drainStartedAt; }
+    public String getAgentId() { return agentId; }
+    public void setAgentId(String agentId) { this.agentId = agentId; }
 }

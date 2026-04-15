@@ -2,6 +2,22 @@ import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "./client"
 import type { WorkerMetricsSnapshot, WorkerMetricsBucket, ClusterMetrics } from "./types"
 
+export interface WorkerSummary {
+  id: string
+  healthState: string
+  agentId: string | null
+  activeTaskCount: number
+  registeredAt: string | null
+}
+
+export function useWorkerList() {
+  return useQuery({
+    queryKey: ["worker-list"],
+    queryFn: () => apiFetch<WorkerSummary[]>("/api/workers"),
+    staleTime: 15_000,
+  })
+}
+
 export function useWorkerSnapshots() {
   return useQuery({
     queryKey: ["worker-snapshots"],

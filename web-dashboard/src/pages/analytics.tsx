@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useStrategy } from "@/api/admin"
-import { useClusterMetrics, useWorkerSnapshots, useWorkerHistory } from "@/api/workers"
+import { useClusterMetrics, useWorkerList, useWorkerHistory } from "@/api/workers"
 import { Badge } from "@/components/ui/badge"
 import { ErrorCard } from "@/components/error-card"
 import { EmptyState } from "@/components/empty-state"
@@ -46,17 +46,22 @@ function HeatmapRow({ workerId }: { workerId: string }) {
 }
 
 function LoadHeatmap() {
-  const { data: workers, isLoading } = useWorkerSnapshots()
+  const { data: workers, isLoading } = useWorkerList()
+
+  const liveWorkers = useMemo(
+    () => (workers ?? []).filter((w) => w.healthState !== "DEAD"),
+    [workers],
+  )
 
   if (isLoading) return <Skeleton className="h-48 w-full" />
-  if (!workers || workers.length === 0) {
+  if (liveWorkers.length === 0) {
     return <p className="text-sm text-slate-500">No workers to display.</p>
   }
 
   return (
     <div className="space-y-1">
-      {workers.map((w) => (
-        <HeatmapRow key={w.workerId} workerId={w.workerId} />
+      {liveWorkers.map((w) => (
+        <HeatmapRow key={w.id} workerId={w.id} />
       ))}
       {/* Legend */}
       <div className="flex items-center gap-2 pt-2">
@@ -76,9 +81,13 @@ function LoadHeatmap() {
 
 function CostSimulator() {
   const { data: cluster } = useClusterMetrics()
+  const { data: workers } = useWorkerList()
   const [costPerHour, setCostPerHour] = useState(0.10)
 
-  const workerCount = cluster?.workerCount ?? 0
+  const workerCount = useMemo(
+    () => (workers ?? []).filter((w) => w.healthState !== "DEAD").length,
+    [workers],
+  )
   const throughput = cluster?.throughputPerMinute ?? 0
 
   const hourlyWorkerHours = workerCount
@@ -126,6 +135,15 @@ function CostSimulator() {
 export default function Analytics() {
   const strategy = useStrategy()
   const cluster = useClusterMetrics()
+  const workerList = useWorkerList()
+
+  const liveWorkerCount = useMemo(
+    () => (workerList.data ?? []).filter((w) => w.healthState !== "DEAD").length,
+    [workerList.data],
+  )
+
+  // Zero out stale metrics when no live workers
+  const effectiveCpu = liveWorkerCount > 0 ? cluster.data?.avgCpuPercent ?? 0 : 0
 
   if (cluster.isError) return <ErrorCard error={cluster.error} onRetry={() => cluster.refetch()} />
   if (!cluster.isLoading && !cluster.data) {
@@ -177,7 +195,7 @@ export default function Analytics() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Cluster CPU</p>
-                  <p className="text-sm font-mono">{Math.round(cluster.data.avgCpuPercent)}%</p>
+                  <p className="text-sm font-mono">{Math.round(effectiveCpu)}%</p>
                 </div>
               </div>
             )}

@@ -31,6 +31,12 @@ Thumbs.db
 # Brainstorm visual companion
 .superpowers/
 
+# LanceDB
+*.lance/
+.lance/
+.lance_db/
+*.lock.lance
+
 # Wiki build artifacts
 docs/.claude_worktrees_*
 wiki/docs/
@@ -38,3 +44,14 @@ wiki/docs/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# MCP config
+.mcp.json
+
+# Repowise
+.repowise/
+
+# Local environment files
+.env.local
+.env.development
+.env.production
