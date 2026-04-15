@@ -42,7 +42,8 @@ docs/.claude_worktrees_*
 wiki/docs/
 .wiki-build/
 
-# Claude Code worktrees
+# Claude Code
+.claude/
 .claude/worktrees/
 
 # MCP config
