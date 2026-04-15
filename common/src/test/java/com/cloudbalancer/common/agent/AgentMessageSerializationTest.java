@@ -86,6 +86,18 @@ class AgentMessageSerializationTest {
     }
 
     @Test
+    void containerCreatingEventRoundTrip() throws Exception {
+        var event = new AgentEvent.ContainerCreatingEvent("agent-1", "worker-5", Instant.now());
+
+        String json = JsonUtil.mapper().writeValueAsString(event);
+        assertThat(json).contains("\"eventType\":\"CONTAINER_CREATING\"");
+
+        var deserialized = JsonUtil.mapper().readValue(json, AgentEvent.class);
+        assertThat(deserialized).isInstanceOf(AgentEvent.ContainerCreatingEvent.class);
+        assertThat(((AgentEvent.ContainerCreatingEvent) deserialized).workerId()).isEqualTo("worker-5");
+    }
+
+    @Test
     void agentRegisteredEventRoundTrip() throws Exception {
         var event = new AgentRegisteredEvent("agent-1", "host-1", 8.0, 16384,
             Set.of(ExecutorType.DOCKER, ExecutorType.SHELL), Instant.now());
