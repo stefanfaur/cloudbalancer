@@ -1,6 +1,6 @@
 # CloudBalancer
 
-A distributed task scheduling and execution platform built with Java 21, Spring Boot 4, Apache Kafka, and PostgreSQL/TimescaleDB. CloudBalancer dispatches tasks across a fleet of worker containers orchestrated by per-host agents, with pluggable execution backends (shell, Docker, Python, simulated), auto-scaling, fault tolerance, real-time log streaming, and a React dashboard for operational control.
+A distributed task scheduling platform on Java 21, Spring Boot 4, Kafka, and PostgreSQL/TimescaleDB. The dispatcher accepts tasks over REST, schedules them onto worker containers that per-host agents spawn through Docker, and streams logs and events back to a React dashboard. Executors cover shell, Docker, Python, and simulated workloads. The cluster auto-scales on CPU and queue pressure, retries failed tasks, dead-letters poison pills, and exposes chaos controls for fault-tolerance experiments.
 
 ## Architecture
 
@@ -40,7 +40,7 @@ Client / CLI  --REST/JWT-->   +---------------------+
 - **Web Dashboard** — React 19 + TypeScript + Vite SPA for task submission, worker/agent monitoring, live metrics, scaling and chaos controls.
 - **Common** — shared models, events, executor framework, agent protocol (no Spring dependency).
 
-Full diagrams live in [docs/architecture-diagrams.md](docs/architecture-diagrams.md).
+Per-module notes and the indexed wiki live under `docs/` and `wiki/`.
 
 ## Prerequisites
 
@@ -71,11 +71,11 @@ The dev stack brings up:
 | `nginx` | Reverse proxy fronting dispatcher + metrics | `80` |
 | `dispatcher` | Control plane (REST + WebSocket) | via nginx `:80` |
 | `metrics-aggregator` | Time-series metrics API | via nginx `:80` |
-| `worker` | One seed worker (legacy host-process mode) | — |
+| `worker` | Seed worker container (not agent-spawned) | — |
 | `worker-agent-1` | Host agent, capacity 8 CPU / 16 GB | — |
 | `worker-agent-2` | Host agent, capacity 4 CPU / 8 GB | — |
 
-The dispatcher runs with `SCALING_RUNTIME_MODE=AGENT`, so new workers are spawned as Docker containers through the worker-agents rather than as local processes.
+The compose file sets `SCALING_RUNTIME_MODE=AGENT`, so the dispatcher asks worker-agents to spawn new worker containers instead of running Docker itself. The other mode, `DOCKER` (the dispatcher default), drives the local Docker socket directly and only makes sense on a single host.
 
 ### Option B: Infrastructure Only, Services via Gradle
 
@@ -158,7 +158,8 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/tasks
 | POST | `/bulk/cancel` | ADMIN, OPERATOR | Cancel a batch of tasks |
 | POST | `/bulk/retry` | ADMIN, OPERATOR | Retry a batch of failed tasks |
 | POST | `/bulk/reprioritize` | ADMIN, OPERATOR | Update priority for many tasks |
-| POST | `/internal/tasks/{taskId}/artifacts/{name}` | internal | Worker artifact upload (unauthenticated) |
+
+Workers upload artifacts through `POST /internal/tasks/{taskId}/artifacts/{name}` (unauthenticated, octet-stream body, not under `/api/tasks`).
 
 #### Workers (`/api/workers`)
 | Method | Path | Auth | Description |
@@ -195,7 +196,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/tasks
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/status` | Current worker counts, policy, cooldown state |
-| PUT | `/policy` | Update policy (`minWorkers`, `maxWorkers`, `cooldownPeriod`, `scaleUpStep`, `scaleDownStep`, `scaleDownDrainTime`) |
+| PUT | `/policy` | Update policy (`minWorkers`, `maxWorkers`, `cooldownSeconds`, `scaleUpStep`, `scaleDownStep`, `drainTimeSeconds`) |
 | POST | `/trigger` | Manually scale up/down by N |
 
 #### Chaos (`/api/admin/chaos`, ADMIN)
@@ -257,7 +258,7 @@ Shell commands run through an allow/deny list; Python runs inside a per-task ven
 
 - **Strategies:** `ROUND_ROBIN`, `WEIGHTED_ROUND_ROBIN`, `LEAST_CONNECTIONS`, `RESOURCE_FIT`, `CUSTOM` (weighted blend of `WorkerScorer` components). Hot-swappable via `PUT /api/admin/strategy`.
 - **Scaling triggers:** `REACTIVE` (CPU high/low windows), `QUEUE_PRESSURE` (queued-vs-active ratio), `MANUAL` (admin-initiated). Evaluated every 30 s by default.
-- **Runtime modes:** `PROCESS` (legacy — spawn JVM workers locally) or `AGENT` (compose default — workers are Docker containers started by `worker-agent` instances per host). Set via `SCALING_RUNTIME_MODE`.
+- **Runtime modes:** `DOCKER` (dispatcher default — it talks to its own Docker socket on a single host) or `AGENT` (compose default — worker-agents spawn containers across hosts). Set via `SCALING_RUNTIME_MODE`.
 - **Worker constraints:** tasks may specify `requiredTags`, `whitelistedWorkers`, `blacklistedWorkers` via `TaskConstraints`.
 
 ## Fault Tolerance
@@ -280,7 +281,7 @@ Key environment variables (defaults shown):
 | `KAFKA_AGENT_USERNAME` / `KAFKA_AGENT_PASSWORD` | `cloudbalancer-agent` / `changeme` | dispatcher + remote agents | SASL_PLAINTEXT creds for REMOTE listener |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/cloudbalancer` | dispatcher, metrics | JDBC URL |
 | `SPRING_DATASOURCE_USERNAME` / `_PASSWORD` | `postgres` / `postgres` | dispatcher, metrics | DB creds |
-| `SCALING_RUNTIME_MODE` | `AGENT` (compose) / `PROCESS` (local) | dispatcher | How scale-ups are materialised |
+| `SCALING_RUNTIME_MODE` | `DOCKER` (dispatcher default), `AGENT` (compose) | dispatcher | How scale-ups are materialised |
 | `WORKER_ID` | `worker-1` | worker | Unique worker identifier |
 | `DISPATCHER_URL` | `http://localhost:8080` | worker, agent | Dispatcher base URL |
 | `AGENT_ID` | `agent-1` | worker-agent | Unique agent identifier |
