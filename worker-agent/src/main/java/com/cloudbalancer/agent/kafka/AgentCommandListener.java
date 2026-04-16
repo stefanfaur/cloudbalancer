@@ -70,7 +70,7 @@ public class AgentCommandListener {
 
             log.info("Started worker {} (container: {})", cmd.workerId(), containerId);
         } catch (Exception e) {
-            log.error("Failed to start worker {}: {}", cmd.workerId(), e.getMessage());
+            log.error("Failed to start worker {}", cmd.workerId(), e);
             publishEvent(new AgentEvent.WorkerStartFailedEvent(
                 props.getId(), cmd.workerId(), e.getMessage(), Instant.now()));
         }

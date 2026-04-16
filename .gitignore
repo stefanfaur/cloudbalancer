@@ -45,6 +45,7 @@ wiki/docs/
 # Claude Code
 .claude/
 .claude/worktrees/
+thoughts/
 
 # MCP config
 .mcp.json

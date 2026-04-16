@@ -14,6 +14,7 @@ public class DockerClientConfig {
     public DockerClient dockerClient(AgentProperties props) {
         var config = DefaultDockerClientConfig.createDefaultConfigBuilder()
             .withDockerHost(props.getDocker().getHost())
+            .withApiVersion("1.41")
             .build();
         var httpClient = new ZerodepDockerHttpClient.Builder()
             .dockerHost(config.getDockerHost())
