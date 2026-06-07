@@ -4,7 +4,8 @@ import { useAuth } from "./use-auth"
 import { useAlerts } from "./use-alerts"
 import type { WsMessage } from "@/api/types"
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost"
+const WS_URL = import.meta.env.VITE_WS_URL ??
+  `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
 const MAX_BACKOFF = 30_000
 const DEBOUNCE_MS = 500
 
@@ -14,9 +15,9 @@ export function useWebSocket() {
   const queryClient = useQueryClient()
   const wsRef = useRef<WebSocket | null>(null)
   const backoffRef = useRef(1000)
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pendingInvalidations = useRef<Set<string>>(new Set())
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [isConnected, setIsConnected] = useState(false)
   const [isReconnecting, setIsReconnecting] = useState(false)
 
