@@ -3,6 +3,11 @@ spring:
     name: cloudbalancer-worker
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    security:
+      protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+    properties:
+      sasl.mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
+      sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG:}
     consumer:
       group-id: ${cloudbalancer.worker.id:worker-1}
       auto-offset-reset: latest
