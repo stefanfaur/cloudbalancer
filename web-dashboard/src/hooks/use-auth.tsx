@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const clearAuth = useCallback(() => {
     setUser(null)

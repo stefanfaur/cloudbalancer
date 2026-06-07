@@ -1,4 +1,3 @@
-import { useMemo } from "react"
 import { X } from "lucide-react"
 import type { ScalingOperation } from "@/hooks/use-scaling-progress"
 
@@ -33,7 +32,7 @@ interface StepCircleProps {
   isFailed: boolean
 }
 
-function StepCircle({ step, label, timestamp, isCompleted, isInProgress, isFailed }: StepCircleProps) {
+function StepCircle({ label, timestamp, isCompleted, isInProgress, isFailed }: StepCircleProps) {
   let circleClasses = "h-5 w-5 rounded-full flex items-center justify-center transition-all duration-150"
 
   if (isFailed) {

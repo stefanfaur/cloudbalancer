@@ -28,7 +28,7 @@ const RECONNECT_STALE_FADE_MS = 5_000  // fade out reconnect stale ops
 
 export function useScalingProgress(isReconnecting = false): ScalingProgressState {
   const [operations, setOperations] = useState<Map<string, ScalingOperation>>(new Map())
-  const cleanupTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
+  const cleanupTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const wasReconnectingRef = useRef(isReconnecting)
 
   // Helper: create operation for scale-up
@@ -221,11 +221,11 @@ export function useScalingProgress(isReconnecting = false): ScalingProgressState
         const next = new Map(prev)
         for (const [key, op] of next) {
           if (!op.completedAt && !op.failed) {
-            op = {
+            const staleOp = {
               ...op,
               failed: { error: "Connection lost — state unknown", timestamp: new Date().toISOString() },
             }
-            next.set(key, op)
+            next.set(key, staleOp)
             scheduleCleanup(key, RECONNECT_STALE_FADE_MS)
           }
         }
