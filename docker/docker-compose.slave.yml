@@ -1,0 +1,30 @@
+# docker/docker-compose.slave.yml
+# CloudBalancer slave agent — remote machine, spawns workers via local Docker
+# Run from docker/ directory: cd docker && cp slave.env.example .env && <set values> && docker compose -f docker-compose.slave.yml --profile build build && docker compose -f docker-compose.slave.yml up -d agent
+
+services:
+  agent:
+    build:
+      context: ..
+      dockerfile: worker-agent/Dockerfile
+    container_name: cloudbalancer-agent-remote
+    restart: unless-stopped
+    environment:
+      AGENT_ID: ${AGENT_ID:?}
+      AGENT_CPU_CORES: ${AGENT_CPU_CORES:?}
+      AGENT_MEMORY_MB: ${AGENT_MEMORY_MB:?}
+      AGENT_REGISTRATION_TOKEN: ${AGENT_REGISTRATION_TOKEN:?}
+      DISPATCHER_URL: http://${MASTER_HOST:?}:8080
+      DOCKER_WORKER_IMAGE: cloudbalancer-worker
+      DOCKER_NETWORK_NAME: bridge
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+
+  worker-image:
+    image: cloudbalancer-worker
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile
+    profiles:
+      - build
