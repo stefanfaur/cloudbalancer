@@ -1,5 +1,5 @@
 package com.cloudbalancer.common.model;
 
 public enum WorkerHealthState {
-    HEALTHY, SUSPECT, DEAD, RECOVERING, DRAINING
+    HEALTHY, SUSPECT, DEAD, RECOVERING, DRAINING, STOPPING
 }

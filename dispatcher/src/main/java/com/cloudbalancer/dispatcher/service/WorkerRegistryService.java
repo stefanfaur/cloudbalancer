@@ -115,6 +115,25 @@ public class WorkerRegistryService {
         return tags;
     }
 
+    /**
+     * Mark a worker STOPPING (admin-initiated kill). The runtime stop is
+     * orchestrated by the caller; this only records the lifecycle state.
+     *
+     * @throws IllegalArgumentException when the worker does not exist
+     * @throws IllegalStateException    when the worker is already STOPPING
+     */
+    public void killWorker(String workerId) {
+        var worker = workerRepository.findById(workerId).orElseThrow(
+            () -> new IllegalArgumentException("Worker not found: " + workerId));
+        if (worker.getHealthState() == WorkerHealthState.STOPPING) {
+            throw new IllegalStateException("Worker already stopping: " + workerId);
+        }
+        worker.setHealthState(WorkerHealthState.STOPPING);
+        worker.setStoppingStartedAt(Instant.now());
+        workerRepository.save(worker);
+        log.info("Worker {} marked STOPPING (admin kill)", workerId);
+    }
+
     public void rebuildResourceLedger() {
         log.info("Rebuilding resource ledger from persisted tasks...");
         var allWorkers = workerRepository.findAll();
