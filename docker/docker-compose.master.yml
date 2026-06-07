@@ -1,0 +1,101 @@
+# docker/docker-compose.master.yml
+# CloudBalancer master control plane — single-machine deployment with Kafka SASL REMOTE listener
+# Run from docker/ directory: cd docker && cp master.env.example .env && <set values> && docker compose -f docker-compose.master.yml up -d --build
+
+services:
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: cloudbalancer-kafka-master
+    ports:
+      - "29094:29094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:29093,EXTERNAL://:9092,REMOTE://:29094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://127.0.0.1:9092,REMOTE://${MASTER_HOST:?}:29094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,REMOTE:SASL_PLAINTEXT
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENER_NAME_REMOTE_PLAIN_SASL_JAAS_CONFIG: >-
+        org.apache.kafka.common.security.plain.PlainLoginModule required
+        username="admin" password="${KAFKA_ADMIN_PASSWORD:?}"
+        user_cloudbalancer-agent="${KAFKA_AGENT_PASSWORD:?}";
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: cloudbalancer-master-cluster-001
+
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: cloudbalancer-postgres-master
+    environment:
+      POSTGRES_DB: cloudbalancer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata-master:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  dispatcher:
+    build:
+      context: ..
+      dockerfile: dispatcher/Dockerfile
+    container_name: cloudbalancer-dispatcher-master
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cloudbalancer
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SCALING_RUNTIME_MODE: AGENT
+      KAFKA_EXTERNAL_BOOTSTRAP: ${MASTER_HOST:?}:29094
+      KAFKA_AGENT_USERNAME: cloudbalancer-agent
+      KAFKA_AGENT_PASSWORD: ${KAFKA_AGENT_PASSWORD:?}
+      CLOUDBALANCER_SECURITY_JWT_SECRET: ${JWT_SECRET:?}
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  metrics-aggregator:
+    build:
+      context: ..
+      dockerfile: metrics-aggregator/Dockerfile
+    container_name: cloudbalancer-metrics-aggregator-master
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cloudbalancer
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      CLOUDBALANCER_SECURITY_JWT_SECRET: ${JWT_SECRET:?}
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: web-dashboard/Dockerfile
+      args:
+        VITE_API_URL: ""
+        VITE_METRICS_URL: ""
+    container_name: cloudbalancer-dashboard-master
+    ports:
+      - "80:80"
+    depends_on:
+      - dispatcher
+      - metrics-aggregator
+
+volumes:
+  pgdata-master:
