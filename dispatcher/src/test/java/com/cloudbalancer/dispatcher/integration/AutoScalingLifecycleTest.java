@@ -43,6 +43,7 @@ class AutoScalingLifecycleTest {
     @Autowired private AutoScalerService autoScaler;
     @Autowired private ScalingPolicyService policyService;
     @Autowired private KafkaContainer kafka;
+    @Autowired private com.cloudbalancer.dispatcher.scaling.AgentRegistry agentRegistry;
 
     private KafkaConsumer<String, String> scalingConsumer;
 
@@ -71,6 +72,7 @@ class AutoScalingLifecycleTest {
 
     @Test
     void reactiveScaleUpLifecycle() {
+        registerAgent();
         // Register 3 initial workers
         registerWorker("w1");
         registerWorker("w2");
@@ -83,22 +85,23 @@ class AutoScalingLifecycleTest {
 
         autoScaler.evaluate();
 
-        // Verify new worker appeared in DB
-        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            var all = workerRepository.findAll();
-            assertThat(all.size()).isGreaterThan(3);
-        });
-
-        // Verify lastDecision
+        // Verify lastDecision reflects a successful runtime start
         var decision = autoScaler.getLastDecision();
         assertThat(decision).isNotNull();
         assertThat(decision.action()).isEqualTo(ScalingAction.SCALE_UP);
         assertThat(decision.triggerType()).isEqualTo(ScalingTriggerType.REACTIVE);
         assertThat(decision.newWorkerCount()).isGreaterThan(decision.previousWorkerCount());
+
+        // Registration is no longer synchronous with container start: the
+        // worker registers itself once its tasks.assigned consumer is ready
+        // (assignment-race fix), so the registry still holds only the three
+        // pre-registered workers here.
+        assertThat(workerRepository.findAll()).hasSize(3);
     }
 
     @Test
     void manualScaleUpAddsWorker() {
+        registerAgent();
         registerWorker("w1");
         registerWorker("w2");
 
@@ -106,11 +109,12 @@ class AutoScalingLifecycleTest {
 
         assertThat(decision.action()).isEqualTo(ScalingAction.SCALE_UP);
         assertThat(decision.triggerType()).isEqualTo(ScalingTriggerType.MANUAL);
+        // the started worker is counted in the decision...
+        assertThat(decision.newWorkerCount()).isEqualTo(decision.previousWorkerCount() + 1);
 
-        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
-            var all = workerRepository.findAll();
-            assertThat(all.size()).isGreaterThanOrEqualTo(3);
-        });
+        // ...but only enters the registry once it self-registers (its
+        // tasks.assigned consumer must join first — assignment-race fix)
+        assertThat(workerRepository.findAll()).hasSize(2);
     }
 
     @Test
@@ -157,6 +161,7 @@ class AutoScalingLifecycleTest {
 
     @Test
     void auditTrailPublishesScalingEvents() {
+        registerAgent();
         registerWorker("w1");
         registerWorker("w2");
 
@@ -202,5 +207,14 @@ class AutoScalingLifecycleTest {
             new ResourceProfile(4, 8192, 10240, false, 0, true),
             Set.of());
         workerRegistry.registerWorker(id, WorkerHealthState.HEALTHY, caps);
+    }
+
+    /** Tests run in AGENT runtime mode; scale-up needs an alive agent with capacity. */
+    private void registerAgent() {
+        agentRegistry.updateAgent(new com.cloudbalancer.common.agent.AgentHeartbeat(
+            "agent-test-1", "test-host", 16.0, 16.0, 32768, 32768,
+            List.of(),
+            Set.of(ExecutorType.SIMULATED, ExecutorType.SHELL, ExecutorType.DOCKER, ExecutorType.PYTHON),
+            Instant.now()));
     }
 }

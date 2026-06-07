@@ -73,8 +73,10 @@ class DockerRuntimeTest {
         assertThat(result).isTrue();
         verify(dockerClient).createContainerCmd("cloudbalancer-worker");
         verify(dockerClient).startContainerCmd("container-123");
-        verify(workerRegistry).registerWorker(eq("auto-docker-1"), eq(WorkerHealthState.HEALTHY), any());
-        verify(eventPublisher).publishEvent(eq("workers.registration"), eq("auto-docker-1"), any());
+        // Container start != worker ready: the worker registers itself once
+        // its tasks.assigned consumer has joined (avoids the assignment race).
+        verify(workerRegistry, never()).registerWorker(any(), any(), any());
+        verify(eventPublisher, never()).publishEvent(eq("workers.registration"), any(), any());
     }
 
     @Test

@@ -38,57 +38,69 @@ public class WorkerFailureHandler {
         );
 
         for (TaskRecord task : inFlightTasks) {
-            TaskState previousState = task.getState();
-            log.info("Re-queuing task {} due to worker {} death", task.getId(), workerId);
-
-            // Record failed attempt with worker-caused flag
-            var failedAttempt = new ExecutionAttempt(
-                task.getExecutionHistory().size() + 1,
-                workerId,
-                task.getAssignedAt() != null ? task.getAssignedAt() : Instant.now(),
-                Instant.now(),
-                1,
-                null,
-                "Worker died",
-                true,  // Worker-caused failure — doesn't count against retry limit
-                task.getCurrentExecutionId()
-            );
-            task.addAttempt(failedAttempt);
-
-            // Fast-forward to FAILED first (need valid transition path)
-            // From ASSIGNED/PROVISIONING/RUNNING we need to get to FAILED then QUEUED
-            if (task.getState() == TaskState.ASSIGNED) {
-                task.transitionTo(TaskState.PROVISIONING);
-            }
-            if (task.getState() == TaskState.PROVISIONING) {
-                task.transitionTo(TaskState.RUNNING);
-            }
-            if (task.getState() == TaskState.RUNNING) {
-                task.transitionTo(TaskState.FAILED);
-            }
-            task.transitionTo(TaskState.QUEUED);
-
-            task.setAssignedWorkerId(null);
-            task.setCurrentExecutionId(UUID.randomUUID());
-            task.setRetryEligibleAt(Instant.now());  // Immediate eligibility
-            taskService.updateTask(task);
-
-            // Release resource ledger
-            workerRegistry.releaseResources(workerId, task.getDescriptor().resourceProfile());
-
-            // Publish state change event
-            eventPublisher.publishEvent("tasks.events", task.getId().toString(),
-                new TaskStateChangedEvent(
-                    UUID.randomUUID().toString(),
-                    Instant.now(),
-                    task.getId(),
-                    previousState,
-                    TaskState.QUEUED,
-                    "Worker died; re-queued"
-                )
-            );
+            requeueInFlight(task, "Worker died; re-queued");
         }
 
         log.info("Re-queued {} tasks due to worker {} death", inFlightTasks.size(), workerId);
+    }
+
+    /**
+     * Re-queue one in-flight (ASSIGNED/PROVISIONING/RUNNING) task. The attempt
+     * is recorded as worker-caused, so it does not count against retry limits.
+     */
+    public void requeueInFlight(TaskRecord task, String reason) {
+        String workerId = task.getAssignedWorkerId();
+        TaskState previousState = task.getState();
+        log.info("Re-queuing task {} (was {} on worker {}): {}",
+            task.getId(), previousState, workerId, reason);
+
+        // Record failed attempt with worker-caused flag
+        var failedAttempt = new ExecutionAttempt(
+            task.getExecutionHistory().size() + 1,
+            workerId,
+            task.getAssignedAt() != null ? task.getAssignedAt() : Instant.now(),
+            Instant.now(),
+            1,
+            null,
+            reason,
+            true,  // Worker-caused failure — doesn't count against retry limit
+            task.getCurrentExecutionId()
+        );
+        task.addAttempt(failedAttempt);
+
+        // Fast-forward to FAILED first (need valid transition path)
+        // From ASSIGNED/PROVISIONING/RUNNING we need to get to FAILED then QUEUED
+        if (task.getState() == TaskState.ASSIGNED) {
+            task.transitionTo(TaskState.PROVISIONING);
+        }
+        if (task.getState() == TaskState.PROVISIONING) {
+            task.transitionTo(TaskState.RUNNING);
+        }
+        if (task.getState() == TaskState.RUNNING) {
+            task.transitionTo(TaskState.FAILED);
+        }
+        task.transitionTo(TaskState.QUEUED);
+
+        task.setAssignedWorkerId(null);
+        task.setCurrentExecutionId(UUID.randomUUID());
+        task.setRetryEligibleAt(Instant.now());  // Immediate eligibility
+        taskService.updateTask(task);
+
+        // Release resource ledger
+        if (workerId != null) {
+            workerRegistry.releaseResources(workerId, task.getDescriptor().resourceProfile());
+        }
+
+        // Publish state change event
+        eventPublisher.publishEvent("tasks.events", task.getId().toString(),
+            new TaskStateChangedEvent(
+                UUID.randomUUID().toString(),
+                Instant.now(),
+                task.getId(),
+                previousState,
+                TaskState.QUEUED,
+                reason
+            )
+        );
     }
 }

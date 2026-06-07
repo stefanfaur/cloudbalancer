@@ -3,28 +3,47 @@ package com.cloudbalancer.worker.kafka;
 import com.cloudbalancer.common.model.TaskAssignment;
 import com.cloudbalancer.common.util.JsonUtil;
 import com.cloudbalancer.worker.service.TaskExecutionService;
+import com.cloudbalancer.worker.service.WorkerRegistrationService;
+import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.listener.ConsumerSeekAware;
 import org.springframework.stereotype.Component;
 
 import org.springframework.beans.factory.annotation.Value;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
-public class TaskAssignmentListener {
+public class TaskAssignmentListener implements ConsumerSeekAware {
 
     private static final Logger log = LoggerFactory.getLogger(TaskAssignmentListener.class);
     private final TaskExecutionService executionService;
+    private final WorkerRegistrationService registrationService;
     private final AtomicBoolean draining;
     private final String workerId;
 
-    public TaskAssignmentListener(TaskExecutionService executionService, AtomicBoolean draining,
+    public TaskAssignmentListener(TaskExecutionService executionService,
+                                  WorkerRegistrationService registrationService,
+                                  AtomicBoolean draining,
                                   @Value("${cloudbalancer.worker.id:worker-1}") String workerId) {
         this.executionService = executionService;
+        this.registrationService = registrationService;
         this.draining = draining;
         this.workerId = workerId;
+    }
+
+    @Override
+    public void onPartitionsAssigned(Map<TopicPartition, Long> assignments,
+                                     ConsumerSeekCallback callback) {
+        // The consumer's position is fixed only once partitions are assigned.
+        // Register with the dispatcher now — any earlier and assignments
+        // could be published below the 'latest' reset position and lost.
+        log.info("tasks.assigned partitions assigned: {} — announcing worker readiness",
+            assignments.keySet());
+        registrationService.registerOnce();
     }
 
     @KafkaListener(topics = "tasks.assigned", groupId = "${cloudbalancer.worker.id:worker-1}")

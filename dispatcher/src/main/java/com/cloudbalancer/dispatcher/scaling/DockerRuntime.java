@@ -1,6 +1,5 @@
 package com.cloudbalancer.dispatcher.scaling;
 
-import com.cloudbalancer.common.event.WorkerRegisteredEvent;
 import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.runtime.NodeRuntime;
 import com.cloudbalancer.common.runtime.WorkerConfig;
@@ -115,17 +114,11 @@ public class DockerRuntime implements NodeRuntime {
 
             workerContainers.put(config.workerId(), response.getId());
 
-            var capabilities = new WorkerCapabilities(
-                config.supportedExecutors(),
-                new ResourceProfile(config.cpuCores(), config.memoryMB(), config.diskMB(), false, 0, true),
-                config.tags());
-            workerRegistry.registerWorker(config.workerId(), WorkerHealthState.HEALTHY, capabilities);
-
-            eventPublisher.publishEvent("workers.registration", config.workerId(),
-                new WorkerRegisteredEvent(UUID.randomUUID().toString(), Instant.now(),
-                    config.workerId(), capabilities));
-
-            log.info("Docker worker started: {} (container: {})", config.workerId(), response.getId());
+            // Container start != worker ready: the worker registers itself on
+            // workers.registration once its tasks.assigned consumer has joined
+            // (avoids assigning tasks its consumer can never see).
+            log.info("Docker worker container started: {} (container: {}); awaiting self-registration",
+                config.workerId(), response.getId());
             return true;
         } catch (Exception e) {
             log.error("Failed to start Docker worker: {}", config.workerId(), e);

@@ -3,8 +3,6 @@ package com.cloudbalancer.dispatcher.kafka;
 import com.cloudbalancer.common.agent.AgentEvent;
 import com.cloudbalancer.common.agent.AgentHeartbeat;
 import com.cloudbalancer.common.agent.AgentRegisteredEvent;
-import com.cloudbalancer.common.event.WorkerRegisteredEvent;
-import com.cloudbalancer.common.model.*;
 import com.cloudbalancer.common.util.JsonUtil;
 import com.cloudbalancer.dispatcher.scaling.AgentRegistry;
 import com.cloudbalancer.dispatcher.scaling.PendingWorkerTracker;
@@ -14,10 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
-import java.util.Set;
-import java.util.UUID;
-
 @Component
 public class AgentEventListener {
 
@@ -26,16 +20,13 @@ public class AgentEventListener {
     private final AgentRegistry agentRegistry;
     private final PendingWorkerTracker pendingTracker;
     private final WorkerRegistryService workerRegistry;
-    private final EventPublisher eventPublisher;
 
     public AgentEventListener(AgentRegistry agentRegistry,
                               PendingWorkerTracker pendingTracker,
-                              WorkerRegistryService workerRegistry,
-                              EventPublisher eventPublisher) {
+                              WorkerRegistryService workerRegistry) {
         this.agentRegistry = agentRegistry;
         this.pendingTracker = pendingTracker;
         this.workerRegistry = workerRegistry;
-        this.eventPublisher = eventPublisher;
     }
 
     @KafkaListener(topics = "agents.heartbeat", groupId = "dispatcher-agents")
@@ -82,17 +73,11 @@ public class AgentEventListener {
     private void handleWorkerStarted(AgentEvent.WorkerStartedEvent event) {
         pendingTracker.resolve(event.workerId());
 
-        var capabilities = new WorkerCapabilities(
-            Set.of(ExecutorType.SIMULATED, ExecutorType.SHELL, ExecutorType.DOCKER),
-            new ResourceProfile(4, 8192, 10240, false, 0, true),
-            Set.of());
-        workerRegistry.registerWorker(event.workerId(), WorkerHealthState.HEALTHY, capabilities);
-
-        eventPublisher.publishEvent("workers.registration", event.workerId(),
-            new WorkerRegisteredEvent(UUID.randomUUID().toString(), Instant.now(),
-                event.workerId(), capabilities));
-
-        log.info("Worker {} started on agent {} (container: {})",
+        // Container start != worker ready. The worker registers itself on
+        // workers.registration once its tasks.assigned consumer has joined;
+        // registering it here would let the scheduler publish assignments
+        // that the consumer (auto-offset-reset: latest) can never see.
+        log.info("Worker {} container started on agent {} (container: {}); awaiting self-registration",
             event.workerId(), event.agentId(), event.containerId());
     }
 
