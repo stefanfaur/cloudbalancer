@@ -176,7 +176,9 @@ def _preflight(
         console.print(f"[bold red]preflight failed:[/bold red] {exc}")
         return False
 
-    if not agents and scaling.worker_count == 0:
+    # workerCount includes stale/dead registry records; activeWorkerCount
+    # reflects workers that can actually take tasks
+    if not agents and scaling.active_worker_count == 0:
         console.print(
             "[bold red]no alive agents — start (or restart) a slave agent "
             "first.[/bold red] A blind SCALE_UP trigger would no-op silently."
@@ -193,10 +195,10 @@ def _preflight(
                 f"until a capable worker appears"
             )
 
-    if scaling.worker_count == 0:
+    if scaling.active_worker_count == 0:
         if no_bootstrap:
             console.print(
-                "[dim]--no-bootstrap: zero workers; observing only[/dim]"
+                "[dim]--no-bootstrap: zero active workers; observing only[/dim]"
             )
         else:
             target = max(agents, key=lambda a: a.available_cpu_cores)
