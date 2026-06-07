@@ -316,6 +316,21 @@ To attach an agent running on a different host:
 
 The agent will POST to `/api/agents/register`, receive SASL Kafka credentials in response, and begin publishing heartbeats on `agents.heartbeat`. The dispatcher's `AgentRegistry` will schedule new workers onto it based on reported capacity.
 
+## Stress Testing
+
+`stress-test/` contains a Python CLI that exercises a running deployment end to end: it submits realistic workloads across all four executor types, shows live progress in a terminal dashboard, and exits 0/1 for use in deployment checks.
+
+```bash
+cd stress-test
+uv sync
+
+uv run cloudbalancer-stress smoke    # one task per executor type
+uv run cloudbalancer-stress burst    # 30 tasks at once — provokes a scale-up
+uv run cloudbalancer-stress chaos --url http://<master-ip> --seed 42
+```
+
+Scenarios: `smoke`, `burst`, `ramp`, `steady`, `chaos`. Point `--url` at the nginx origin (port 80). See [stress-test/README.md](stress-test/README.md) for flags, the workload catalog, and deployment notes.
+
 ## Project Structure
 
 ```
@@ -326,6 +341,7 @@ cloudbalancer/
   worker-agent/            Per-host Docker orchestrator, Kafka command listener
   metrics-aggregator/      Kafka consumers, TimescaleDB persistence, metrics REST API
   web-dashboard/           React 19 + Vite + shadcn/ui operational dashboard
+  stress-test/             Python CLI for load scenarios against a live deployment
   docker/                  docker-compose.dev.yml, docker-compose.agent.yml, nginx.conf
   docs/                    Architecture diagrams and design documents
 ```
@@ -347,6 +363,10 @@ cloudbalancer/
 cd web-dashboard
 npm run test          # Vitest unit + component tests
 npx playwright test   # E2E (expects the dev stack running)
+
+# Stress-test CLI
+cd stress-test
+uv run pytest         # unit tests, no network needed
 ```
 
 Backend tests use [Testcontainers](https://testcontainers.com/) to spin up Kafka and PostgreSQL automatically — Docker must be running.
