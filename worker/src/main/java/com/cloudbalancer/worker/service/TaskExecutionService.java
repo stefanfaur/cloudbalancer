@@ -78,6 +78,12 @@ public class TaskExecutionService {
             return;
         }
 
+        // Announce that this worker has accepted the task and is starting it, so
+        // the dispatcher can move it out of ASSIGNED. Without this signal a task
+        // sits ASSIGNED for its whole execution and the dispatcher's stale-
+        // assignment scanner can mistake a live task for a lost one.
+        publishStatus(assignment, TaskState.RUNNING);
+
         int timeoutSeconds = descriptor.executionPolicy() != null
             ? descriptor.executionPolicy().timeoutSeconds() : 300;
 
@@ -230,6 +236,20 @@ public class TaskExecutionService {
             }
         } catch (IOException e) {
             log.warn("Failed to clean up working directory {}: {}", workDir, e.getMessage());
+        }
+    }
+
+    private void publishStatus(TaskAssignment assignment, TaskState state) {
+        try {
+            var update = new TaskStatusUpdate(
+                assignment.taskId(), workerId, assignment.executionId(), state, Instant.now());
+            String json = JsonUtil.mapper().writeValueAsString(update);
+            kafkaTemplate.send("tasks.status", assignment.taskId().toString(), json);
+        } catch (Exception e) {
+            // Best-effort: a missed status update only delays the dispatcher's
+            // ASSIGNED->RUNNING transition; the terminal result still settles it.
+            log.warn("Failed to publish {} status for task {}: {}",
+                state, assignment.taskId(), e.getMessage());
         }
     }
 

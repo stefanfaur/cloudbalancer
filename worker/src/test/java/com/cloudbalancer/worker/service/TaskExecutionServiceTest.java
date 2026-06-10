@@ -106,4 +106,29 @@ class TaskExecutionServiceTest {
         assertThat(result.timedOut()).isTrue();
         assertThat(result.succeeded()).isFalse();
     }
+
+    @Test
+    void publishesRunningStatusBeforeExecuting() throws Exception {
+        var service = new TaskExecutionService(kafkaTemplate, "test-worker", circuitBreaker, workerChaosService, List.of(new SimulatedExecutor()), artifactService);
+        var descriptor = new TaskDescriptor(
+            ExecutorType.SIMULATED, Map.of("durationMs", 50, "failProbability", 0.0),
+            new ResourceProfile(1, 512, 256, false, 10, false),
+            TaskConstraints.unconstrained(), Priority.NORMAL,
+            ExecutionPolicy.defaults(), TaskIO.none()
+        );
+        var assignment = new TaskAssignment(UUID.randomUUID(), descriptor, "test-worker", Instant.now(), UUID.randomUUID());
+
+        service.executeTask(assignment);
+
+        // A RUNNING status is published to tasks.status so the dispatcher can
+        // move the task out of ASSIGNED while it executes.
+        ArgumentCaptor<String> statusCaptor = ArgumentCaptor.forClass(String.class);
+        verify(kafkaTemplate).send(eq("tasks.status"), eq(assignment.taskId().toString()), statusCaptor.capture());
+
+        TaskStatusUpdate status = JsonUtil.mapper().readValue(statusCaptor.getValue(), TaskStatusUpdate.class);
+        assertThat(status.taskId()).isEqualTo(assignment.taskId());
+        assertThat(status.workerId()).isEqualTo("test-worker");
+        assertThat(status.executionId()).isEqualTo(assignment.executionId());
+        assertThat(status.state()).isEqualTo(TaskState.RUNNING);
+    }
 }
