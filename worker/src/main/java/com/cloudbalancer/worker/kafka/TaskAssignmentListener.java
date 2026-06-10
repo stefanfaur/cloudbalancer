@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
@@ -24,15 +25,18 @@ public class TaskAssignmentListener implements ConsumerSeekAware {
     private final WorkerRegistrationService registrationService;
     private final AtomicBoolean draining;
     private final String workerId;
+    private final Executor taskIntakeExecutor;
 
     public TaskAssignmentListener(TaskExecutionService executionService,
                                   WorkerRegistrationService registrationService,
                                   AtomicBoolean draining,
-                                  @Value("${cloudbalancer.worker.id:worker-1}") String workerId) {
+                                  @Value("${cloudbalancer.worker.id:worker-1}") String workerId,
+                                  Executor taskIntakeExecutor) {
         this.executionService = executionService;
         this.registrationService = registrationService;
         this.draining = draining;
         this.workerId = workerId;
+        this.taskIntakeExecutor = taskIntakeExecutor;
     }
 
     @Override
@@ -62,7 +66,10 @@ public class TaskAssignmentListener implements ConsumerSeekAware {
             }
 
             log.info("Received task assignment: {}", assignment.taskId());
-            executionService.executeTask(assignment);
+            // Run on the bounded intake executor so the Kafka consumer thread is
+            // free to keep draining assignments (and report RUNNING promptly).
+            // CallerRunsPolicy on a saturated pool applies backpressure here.
+            taskIntakeExecutor.execute(() -> executionService.executeTask(assignment));
         } catch (Exception e) {
             log.error("Failed to process task assignment", e);
         }

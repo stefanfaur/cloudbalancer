@@ -13,6 +13,7 @@ public class WorkerProperties {
     private int cpuCores = 4;
     private int memoryMb = 8192;
     private int diskMb = 10240;
+    private int maxConcurrentTasks = 4;
     private Set<String> tags = Set.of();
     private long metricsIntervalMs = 5000;
     private long heartbeatIntervalMs = 10000;
@@ -31,6 +32,8 @@ public class WorkerProperties {
     public void setMemoryMb(int memoryMb) { this.memoryMb = memoryMb; }
     public int getDiskMb() { return diskMb; }
     public void setDiskMb(int diskMb) { this.diskMb = diskMb; }
+    public int getMaxConcurrentTasks() { return maxConcurrentTasks; }
+    public void setMaxConcurrentTasks(int maxConcurrentTasks) { this.maxConcurrentTasks = maxConcurrentTasks; }
     public Set<String> getTags() { return tags; }
     public void setTags(Set<String> tags) { this.tags = tags; }
     public long getMetricsIntervalMs() { return metricsIntervalMs; }

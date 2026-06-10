@@ -24,6 +24,9 @@ cloudbalancer:
     cpu-cores: 4
     memory-mb: 8192
     disk-mb: 10240
+    # Max tasks a worker runs concurrently. Beyond this the Kafka listener thread
+    # runs the overflow task itself (backpressure) instead of oversubscribing CPU.
+    max-concurrent-tasks: 4
     tags: []
     metrics-interval-ms: 5000
     heartbeat-interval-ms: 10000

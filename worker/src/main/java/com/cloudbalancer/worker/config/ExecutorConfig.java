@@ -17,9 +17,37 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
 public class ExecutorConfig {
+
+    /**
+     * Bounded pool that runs accepted task assignments. Capping concurrency to
+     * {@code max-concurrent-tasks} prevents a worker from oversubscribing its
+     * host CPU; the {@link ThreadPoolExecutor.CallerRunsPolicy} makes the Kafka
+     * listener thread run the overflow task itself, which applies backpressure
+     * (the consumer stops polling new assignments until a slot frees) instead of
+     * letting an unbounded in-memory backlog build up.
+     */
+    @Bean(destroyMethod = "shutdown")
+    public ExecutorService taskIntakeExecutor(WorkerProperties props) {
+        int n = Math.max(1, props.getMaxConcurrentTasks());
+        AtomicInteger seq = new AtomicInteger(0);
+        return new ThreadPoolExecutor(
+                n, n, 0L, TimeUnit.MILLISECONDS,
+                new SynchronousQueue<>(),
+                r -> {
+                    Thread t = new Thread(r, "task-intake-" + seq.incrementAndGet());
+                    t.setDaemon(true);
+                    return t;
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy());
+    }
 
     @Bean
     public List<TaskExecutor> taskExecutors(WorkerProperties props) {
